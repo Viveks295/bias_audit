@@ -1,3 +1,4 @@
+import random
 from .base import Variation
 
 class SpellingVariation(Variation):
@@ -15,8 +16,10 @@ class SpellingVariation(Variation):
             Text with spelling errors.
         """
         # TODO: implement spelling perturbation based on magnitude
+        # Determine error rate from magnitude (0-100)
+        error_rate = magnitude / 100.0
         words = text.split()
-        num_errors = int(len(words) * magnitude)
+        num_errors = int(len(words) * error_rate)
         error_indices = random.sample(range(len(words)), num_errors)
 
         def corrupt_word(word):

@@ -1,4 +1,15 @@
+import random
+import re
+import nltk
+# Try to import googletrans Translator; if unavailable, translator will be set later (e.g., in tests)
+try:
+    from googletrans import Translator
+    translator = Translator()
+except Exception:
+    translator = None
 from .base import Variation
+
+phrase_cache = {}
 
 class SpanglishVariation(Variation):
     """
@@ -26,6 +37,7 @@ class SpanglishVariation(Variation):
                 print(f"Error translating '{phrase}': {e}")
                 return phrase  # Return original phrase if translation fails
 
+        error_rate = magnitude / 100.0  # Convert percentage to decimal
         sentences = nltk.sent_tokenize(text)  # Tokenize text into sentences
         all_phrases = []  # Store all phrases globally
         phrase_indices = []  # Track where phrases belong for reconstruction
@@ -39,7 +51,7 @@ class SpanglishVariation(Variation):
 
         # Step 2: Select global phrases for translation (only those with letters)
         letter_phrases = [i for i, phrase in enumerate(all_phrases) if any(c.isalpha() for c in phrase)]
-        num_to_translate = max(1, int(len(letter_phrases) * magnitude))  # Ensure at least one phrase is translated
+        num_to_translate = max(1, int(len(letter_phrases) * error_rate))  # Ensure at least one phrase is translated
         selected_indices = set(random.sample(letter_phrases, min(num_to_translate, len(letter_phrases))))  # Ensure valid selection
 
         # Step 3: Translate selected phrases asynchronously

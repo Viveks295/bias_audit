@@ -1,3 +1,5 @@
+import re
+import random
 from .base import Variation
 
 class PioVariation(Variation):
@@ -15,6 +17,8 @@ class PioVariation(Variation):
             Transformed text.
         """
         # TODO: implement PIO transformation based on magnitude
+        # Error rate from magnitude (0-100)
+        error_rate = magnitude / 100.0
         substitutions = [
         # Vowel substitutions
         (r'\b(e|E)', 'i'),

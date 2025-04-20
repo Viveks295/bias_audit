@@ -1,3 +1,11 @@
+import random
+import nltk
+# Try to import googletrans Translator; if unavailable, translator will be set later (e.g., in tests)
+try:
+    from googletrans import Translator
+    translator = Translator()
+except Exception:
+    translator = None
 from .base import Variation
 
 class NounTransferVariation(Variation):
@@ -24,10 +32,11 @@ class NounTransferVariation(Variation):
 
         noun_cache = {}
 
+        error_rate = magnitude / 100.0
         tokens = nltk.word_tokenize(text)
         tagged_tokens = nltk.pos_tag(tokens)
         nouns = [word for word, tag in tagged_tokens if noun(word, tag)]
-        num_nouns_to_translate = int(len(nouns) * magnitude)
+        num_nouns_to_translate = int(len(nouns) * error_rate)
 
         if num_nouns_to_translate == 0 and len(nouns) > 0:
             num_nouns_to_translate = 1 # Translate at least one noun

@@ -1,4 +1,15 @@
+import random
+import difflib
+import nltk
+# Try to import googletrans Translator; if unavailable, translator will be set later (e.g., in tests)
+try:
+    from googletrans import Translator
+    translator = Translator()
+except Exception:
+    translator = None
 from .base import Variation
+
+cognate_cache = {}
 
 class CognatesVariation(Variation):
     """
@@ -14,6 +25,8 @@ class CognatesVariation(Variation):
         Returns:
             Text with cognate replacements.
         """
+        # Error rate from magnitude (0-100)
+        error_rate = magnitude / 100.0
         # TODO: implement cognate replacements based on magnitude
         async def translate_word(word):
             result = await translator.translate(word, dest="es")
