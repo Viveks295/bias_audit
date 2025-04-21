@@ -1,16 +1,23 @@
-Metadata-Version: 2.1
-Name: essay-bias-audit
+Metadata-Version: 2.4
+Name: essay_bias_audit
 Version: 0.1.0
 Summary: A package to audit bias in essay grading models
-Home-page: UNKNOWN
 Author: 
 Author-email: 
-License: UNKNOWN
-Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown
+Requires-Dist: pandas
+Requires-Dist: click
+Requires-Dist: nltk
+Requires-Dist: deep-translator
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
 
 # essay_bias_audit
 
@@ -21,6 +28,8 @@ text variations (e.g., spelling errors, code-switching), and analyze how these v
 
 ```bash
 pip install .
+# Needed for translation variations
+pip install deepl nltk
 ```
 
 ## Usage
@@ -51,10 +60,13 @@ print(report.head())
 
 ## CLI
 
+Make sure to set your DeepL API key as an environment variable:
+```bash
+export DEEPL_API_KEY=your_deepl_api_key
+```
 ```bash
 essay-bias-audit --data essays.csv --model-script model.py --model-func grade \
   --variations spelling --magnitudes 30 \
   --variations spanglish --magnitudes 50 \
   --output audit_results.csv
-```  
-
+```

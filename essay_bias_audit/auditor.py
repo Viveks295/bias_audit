@@ -1,6 +1,4 @@
 import pandas as pd
-import inspect
-
 from .variations import get_variation
 
 class Auditor:
@@ -62,25 +60,8 @@ class Auditor:
         """
         variation = get_variation(variation_name)
         df = self.data.copy()
-        # Apply variation; supports async functions returning awaitables
-        texts = df['essay'].tolist()
-        results = [variation.apply(text, magnitude) for text in texts]
-        # If the variation.apply returned awaitables, run them asynchronously
-        if results and inspect.isawaitable(results[0]):
-            import asyncio
-            # Run all awaitables in a fresh event loop
-            loop = asyncio.new_event_loop()
-            # Set as current loop so gather binds tasks correctly
-            asyncio.set_event_loop(loop)
-            try:
-                new_texts = loop.run_until_complete(asyncio.gather(*results))
-            finally:
-                # Reset event loop and close
-                asyncio.set_event_loop(None)
-                loop.close()
-        else:
-            new_texts = results
-        df['essay'] = new_texts
+        # Apply variation synchronously
+        df['essay'] = df['essay'].apply(lambda text: variation.apply(text, magnitude))
         return df
 
     def audit(self, variations: list, magnitudes: list) -> pd.DataFrame:

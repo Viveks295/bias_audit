@@ -1,21 +1,20 @@
 import random
 import difflib
 import nltk
-# Try to import googletrans Translator; if unavailable, translator will be set later (e.g., in tests)
-try:
-    from googletrans import Translator
-    translator = Translator()
-except Exception:
-    translator = None
+from deep_translator import GoogleTranslator
 from .base import Variation
 
+# Cache for translations
 cognate_cache = {}
+
+# Translator instance (uses free Google Translate)
+translator = GoogleTranslator(source='auto', target='es')
 
 class CognatesVariation(Variation):
     """
     Variation that replaces words with their cognates.
     """
-    async def apply(self, text: str, magnitude: int) -> str:
+    def apply(self, text: str, magnitude: int) -> str:
         """
         Replace words with cognates based on magnitude.
 
@@ -28,9 +27,9 @@ class CognatesVariation(Variation):
         # Error rate from magnitude (0-100)
         error_rate = magnitude / 100.0
         # TODO: implement cognate replacements based on magnitude
-        async def translate_word(word):
-            result = await translator.translate(word, dest="es")
-            return result.text  # Ensure this is awaited properly
+        def translate_word(word):
+            # Use deep-translator Google Translate under the hood
+            return translator.translate(word)
 
         def is_cognate(eng_word, esp_word, threshold=0.7):
             """
@@ -56,7 +55,7 @@ class CognatesVariation(Variation):
                     translation, is_candidate = cognate_cache[token]
                 else:
                     try:
-                        translation = await translate_word(token)
+                        translation = translate_word(token)
                         is_candidate = is_cognate(token, translation)
                         cognate_cache[token] = (translation, is_candidate)
                     except Exception as e:

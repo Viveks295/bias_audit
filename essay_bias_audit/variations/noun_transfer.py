@@ -1,18 +1,16 @@
 import random
 import nltk
-# Try to import googletrans Translator; if unavailable, translator will be set later (e.g., in tests)
-try:
-    from googletrans import Translator
-    translator = Translator()
-except Exception:
-    translator = None
+from deep_translator import GoogleTranslator
 from .base import Variation
+
+# Translator instance (uses free Google Translate)
+translator = GoogleTranslator(source='auto', target='es')
 
 class NounTransferVariation(Variation):
     """
     Variation that performs noun transfer transformations.
     """
-    async def apply(self, text: str, magnitude: int) -> str:
+    def apply(self, text: str, magnitude: int) -> str:
         """
         Apply noun transfer transformation based on magnitude.
 
@@ -23,9 +21,9 @@ class NounTransferVariation(Variation):
             Transformed text.
         """
         # TODO: implement noun transfer based on magnitude
-        async def translate_word(word):
-            result = await translator.translate(word, dest="es")
-            return result.text  # Ensure this is awaited properly
+        def translate_word(word):
+            # Use deep-translator GoogleTranslate under the hood
+            return translator.translate(word)
 
         def noun(word, tag):
             return tag.startswith('NN') 
@@ -52,7 +50,7 @@ class NounTransferVariation(Variation):
                         if word in noun_cache:
                             translation = noun_cache[word]
                         else:
-                            translation = await translate_word(word)
+                            translation = translate_word(word)
                             noun_cache[word] = translation
                         new_text += translation + " "
                     except Exception as e:

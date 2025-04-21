@@ -1,21 +1,18 @@
 import random
 import re
 import nltk
-# Try to import googletrans Translator; if unavailable, translator will be set later (e.g., in tests)
-try:
-    from googletrans import Translator
-    translator = Translator()
-except Exception:
-    translator = None
+from deep_translator import GoogleTranslator
 from .base import Variation
 
+# Translator instance (uses free Google Translate)
+translator = GoogleTranslator(source='auto', target='es')
 phrase_cache = {}
 
 class SpanglishVariation(Variation):
     """
     Variation that mixes Spanish and English (Spanglish).
     """
-    async def apply(self, text: str, magnitude: int) -> str:
+    def apply(self, text: str, magnitude: int) -> str:
         """
         Introduce Spanglish code-switching based on magnitude.
 
@@ -28,14 +25,9 @@ class SpanglishVariation(Variation):
         # TODO: implement Spanglish mixing based on magnitude
         CONJUNCTIONS = r'\b(?:and|or|but|because|so|yet|although|though|since|unless|whereas|while)\b'
 
-        async def translate_phrase(phrase):
-            """Asynchronously translates a given phrase from English to Spanish."""
-            try:
-                result = await translator.translate(phrase, src='en', dest='es')
-                return result.text  # Extract translated text
-            except Exception as e:
-                print(f"Error translating '{phrase}': {e}")
-                return phrase  # Return original phrase if translation fails
+        def translate_phrase(phrase):
+            # Translate phrase using deep-translator
+            return translator.translate(phrase)
 
         error_rate = magnitude / 100.0  # Convert percentage to decimal
         sentences = nltk.sent_tokenize(text)  # Tokenize text into sentences
@@ -54,14 +46,14 @@ class SpanglishVariation(Variation):
         num_to_translate = max(1, int(len(letter_phrases) * error_rate))  # Ensure at least one phrase is translated
         selected_indices = set(random.sample(letter_phrases, min(num_to_translate, len(letter_phrases))))  # Ensure valid selection
 
-        # Step 3: Translate selected phrases asynchronously
+        # Step 3: Translate selected phrases
         translated_phrases = []
         for i, phrase in enumerate(all_phrases):
             if i in selected_indices:
                 if phrase in phrase_cache:
                     translated_phrase = phrase_cache[phrase]
                 else:
-                    translated_phrase = await translate_phrase(phrase)
+                    translated_phrase = translate_phrase(phrase)
                     phrase_cache[phrase] = translated_phrase
                 translated_phrases.append(translated_phrase)
             else:

@@ -6,7 +6,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         'pandas',
-        'click'
+        'click',
+        'nltk',
+        'deep-translator'
     ],
     author='',
     author_email='',

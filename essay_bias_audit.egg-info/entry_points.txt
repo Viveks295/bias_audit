@@ -1,3 +1,2 @@
 [console_scripts]
 essay-bias-audit = essay_bias_audit.cli:main
-

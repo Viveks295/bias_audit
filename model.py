@@ -1,2 +1,2 @@
 def grade(prompt, essay):
-    return len(essay) % 4
+    return len(essay)

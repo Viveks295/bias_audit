@@ -2,11 +2,21 @@
 
 A Python package to audit bias in essay grading models. It allows users to grade essays with their model, apply
 text variations (e.g., spelling errors, code-switching), and analyze how these variations affect model grading.
+By default uses deep-translator (GoogleTranslator) for translations.
 
 ## Installation
 
 ```bash
 pip install .
+```
+
+NLTK data (required for tokenization and tagging):
+```bash
+python - <<EOF
+import nltk
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+EOF
 ```
 
 ## Usage
@@ -42,4 +52,4 @@ essay-bias-audit --data essays.csv --model-script model.py --model-func grade \
   --variations spelling --magnitudes 30 \
   --variations spanglish --magnitudes 50 \
   --output audit_results.csv
-```  
+```
