@@ -1,8 +1,7 @@
 # essay_bias_audit
 
 A Python package to audit bias in essay grading models. It allows users to grade essays with their model, apply
-text variations (e.g., spelling errors, code-switching), and analyze how these variations affect model grading.
-By default uses deep-translator (GoogleTranslator) for translations.
+text variations (e.g., spelling errors, noun transfer), and analyze how these variations affect model grading.
 
 ## Installation
 
@@ -14,9 +13,7 @@ This package declares NLTK as a dependency (for tokenization and POS tagging); `
 ```bash
 python - <<EOF
 import nltk
-# Sentence and word tokenization
 nltk.download('punkt')
-# Part‑of‑speech tagging model
 nltk.download('averaged_perceptron_tagger')
 EOF
 ```
