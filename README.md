@@ -10,11 +10,13 @@ By default uses deep-translator (GoogleTranslator) for translations.
 pip install .
 ```
 
-NLTK data (required for tokenization and tagging):
+This package declares NLTK as a dependency (for tokenization and POS tagging); `pip install .` will install `nltk`, but you must download its language models:
 ```bash
 python - <<EOF
 import nltk
+# Sentence and word tokenization
 nltk.download('punkt')
+# Part‑of‑speech tagging model
 nltk.download('averaged_perceptron_tagger')
 EOF
 ```
