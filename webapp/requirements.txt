@@ -1,0 +1,5 @@
+Flask
+pandas
+nltk
+deep-translator
+essay_bias_audit

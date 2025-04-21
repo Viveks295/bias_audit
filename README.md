@@ -55,3 +55,17 @@ essay-bias-audit --data essays.csv --model-script model.py --model-func grade \
   --variations spanglish --magnitudes 50 \
   --output audit_results.csv
 ```
+
+## Web Interface
+
+We provide a minimal Flask web app under the `webapp/` directory. To run:
+```bash
+# 1. Install your package in editable mode (from project root)
+pip install -e .
+# 2. Install webapp dependencies
+cd webapp
+pip install -r requirements.txt
+# 3. Run the Flask app
+python app.py
+```
+Then visit http://127.0.0.1:5000 in your browser, upload your CSV and model, select variations and magnitudes, and view or download the audit results.
