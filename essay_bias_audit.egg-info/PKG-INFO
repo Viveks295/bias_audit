@@ -23,13 +23,23 @@ Dynamic: summary
 
 A Python package to audit bias in essay grading models. It allows users to grade essays with their model, apply
 text variations (e.g., spelling errors, code-switching), and analyze how these variations affect model grading.
+By default uses deep-translator (GoogleTranslator) for translations.
 
 ## Installation
 
 ```bash
 pip install .
-# Needed for translation variations
-pip install deepl nltk
+```
+
+This package declares NLTK as a dependency (for tokenization and POS tagging); `pip install .` will install `nltk`, but you must download its language models:
+```bash
+python - <<EOF
+import nltk
+# Sentence and word tokenization
+nltk.download('punkt')
+# Part‑of‑speech tagging model
+nltk.download('averaged_perceptron_tagger')
+EOF
 ```
 
 ## Usage
@@ -60,13 +70,23 @@ print(report.head())
 
 ## CLI
 
-Make sure to set your DeepL API key as an environment variable:
-```bash
-export DEEPL_API_KEY=your_deepl_api_key
-```
 ```bash
 essay-bias-audit --data essays.csv --model-script model.py --model-func grade \
   --variations spelling --magnitudes 30 \
   --variations spanglish --magnitudes 50 \
   --output audit_results.csv
 ```
+
+## Web Interface
+
+We provide a minimal Flask web app under the `webapp/` directory. To run:
+```bash
+# 1. Install your package in editable mode (from project root)
+pip install -e .
+# 2. Install webapp dependencies
+cd webapp
+pip install -r requirements.txt
+# 3. Run the Flask app
+python app.py
+```
+Then visit http://127.0.0.1:5000 in your browser, upload your CSV and model, select variations and magnitudes, and view or download the audit results.

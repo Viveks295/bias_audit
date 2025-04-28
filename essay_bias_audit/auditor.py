@@ -98,3 +98,41 @@ class Auditor:
                 })
         self.results = pd.DataFrame(results)
         return self.results
+    
+    def preview_variation(
+        self,
+        variation_name: str,
+        magnitude: int,
+        n_samples: int = 5,
+        random_state: int = None,
+    ) -> pd.DataFrame:
+        """
+        Preview a few examples of original vs. perturbed essays for a given variation.
+
+        Args:
+            variation_name: Name of the variation to apply.
+            magnitude: Variation magnitude (0-100).
+            n_samples: Number of samples to return (defaults to 5).
+            random_state: Optional random seed for reproducible sampling.
+        Returns:
+            DataFrame with columns ['index', 'prompt', 'original_essay', 'perturbed_essay'],
+            containing a random sample of essays and their perturbed versions.
+        """
+        # Apply variation to all essays
+        perturbed = self.perturb(variation_name, magnitude)
+        # Build DataFrame with original and perturbed essays
+        df_orig = self.data.reset_index()
+        df_preview = pd.DataFrame({
+            'index': df_orig['index'],
+            'prompt': df_orig['prompt'],
+            'original_essay': df_orig['essay'],
+            'perturbed_essay': perturbed['essay'].values,
+        })
+        # Sample rows
+        n = min(n_samples, len(df_preview))
+        if random_state is not None:
+            sample_df = df_preview.sample(n=n, random_state=random_state)
+        else:
+            sample_df = df_preview.sample(n=n)
+        # Reset index for returned samples
+        return sample_df.reset_index(drop=True)

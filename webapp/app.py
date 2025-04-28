@@ -21,14 +21,14 @@ def index():
         model_file = request.files.get('model')
         model_func = request.form.get('model_func', 'grade')
         variations = request.form.getlist('variations')
-        magnitudes_text = request.form.get('magnitudes', '')
-        if not data_file or not model_file or not variations or not magnitudes_text:
+        magnitudes_list = request.form.getlist('magnitudes')
+        if not data_file or not model_file or not variations or not magnitudes_list:
             flash('All fields are required, and at least one variation must be selected.')
             return redirect(url_for('index'))
         try:
-            magnitudes = [int(x.strip()) for x in magnitudes_text.split(',')]
+            magnitudes = [int(x.strip()) for x in magnitudes_list]
         except ValueError:
-            flash('Magnitudes must be comma-separated integers.')
+            flash('Magnitudes must be integer values.')
             return redirect(url_for('index'))
         if len(magnitudes) != len(variations):
             flash('Number of magnitudes must match number of variations.')
@@ -55,7 +55,30 @@ def index():
         report_path = os.path.join(WORKDIR, 'audit_report.csv')
         report.to_csv(report_path, index=False)
         # Render results
-        table_html = report.to_html(classes='table table-bordered', index=False)
+        # Summarize to one row per variation, avg difference only
+        summary_df = (
+            report
+            .groupby('variation', as_index=False)['difference']
+            .mean()
+            .rename(columns={'difference': 'bias_0'})
+        )
+
+        mag_map = dict(zip(variations, magnitudes))
+
+        # Add the new column: avg_difference divided by that variation’s magnitude
+        # summary_df['bias_1'] = (
+        #     summary_df['bias_0'] /
+        #     summary_df['variation'].map(mag_map)
+        )
+    
+        # Render summarized results with Tailwind CSS classes
+        table_html = summary_df.to_html(
+            classes='min-w-full bg-white divide-y divide-gray-200 divide-x divide-gray-200 text-sm text-gray-700',
+            index=False,
+            border=0
+        )
+
+        # table_html = report.to_html(classes='table table-bordered', index=False)
         return render_template('results.html', table_html=table_html)
     return render_template('index.html', variations=VARIATIONS)
 

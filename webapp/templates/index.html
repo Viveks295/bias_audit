@@ -3,46 +3,222 @@
 <head>
   <meta charset="utf-8">
   <title>Essay Bias Audit</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 </head>
-<body class="p-4">
-  <div class="container">
-    <h1>Essay Bias Audit</h1>
+<body class="bg-gray-100 min-h-screen p-6 flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl p-8 space-y-6">
+    <h1 class="text-3xl font-extrabold text-gray-900">Essay Bias Audit</h1>
     {% with messages = get_flashed_messages() %}
       {% if messages %}
-      <div class="alert alert-warning" role="alert">
-        {% for msg in messages %}{{ msg }}<br>{% endfor %}
+      <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md">
+        <ul class="list-disc list-inside">
+          {% for msg in messages %}
+          <li>{{ msg }}</li>
+          {% endfor %}
+        </ul>
       </div>
       {% endif %}
     {% endwith %}
-    <form method="post" enctype="multipart/form-data">
-      <div class="form-group">
-        <label>Data CSV (must have 'prompt' and 'essay' columns)</label>
-        <input type="file" class="form-control-file" name="data" accept=".csv" required>
+    <form method="post" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="block text-gray-700 font-medium mb-2">
+          Data CSV (must have 'prompt' and 'essay' columns)
+          <button type="button"
+                  data-key="data"
+                  class="tooltip-icon ml-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <i class="fas fa-info-circle"></i>
+          </button>
+        </label>
+        <input type="file" name="data" accept=".csv" required
+          class="block w-full text-sm text-gray-900 bg-gray-50 rounded border border-gray-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
-      <div class="form-group">
-        <label>Model Script (Python file defining grading function)</label>
-        <input type="file" class="form-control-file" name="model" accept=".py" required>
+      <div>
+        <label class="block text-gray-700 font-medium mb-2">
+          Model Script (Python file defining grading function)
+          <button type="button"
+                  data-key="model"
+                  class="tooltip-icon ml-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <i class="fas fa-info-circle"></i>
+          </button>
+        </label>
+        <input type="file" name="model" accept=".py" required
+          class="block w-full text-sm text-gray-900 bg-gray-50 rounded border border-gray-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
-      <div class="form-group">
-        <label>Model Function Name</label>
-        <input type="text" class="form-control" name="model_func" value="grade" required>
+      <div>
+        <label class="block text-gray-700 font-medium mb-2">
+          Model Function Name
+          <button type="button"
+                  data-key="model_func"
+                  class="tooltip-icon ml-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <i class="fas fa-info-circle"></i>
+          </button>
+        </label>
+        <input type="text" name="model_func" value="grade" required
+          class="shadow border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
-      <div class="form-group">
-        <label>Variations</label><br>
-        {% for var in variations %}
-        <div class="form-check form-check-inline">
-          <input class="form-check-input" type="checkbox" name="variations" id="var_{{ var }}" value="{{ var }}">
-          <label class="form-check-label" for="var_{{ var }}">{{ var }}</label>
+      <div>
+        <label class="block text-gray-700 font-medium mb-2">
+          Variations
+          <button type="button"
+                  data-key="variations"
+                  class="tooltip-icon ml-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <i class="fas fa-info-circle"></i>
+          </button>
+        </label>
+        <div class="flex flex-wrap gap-4">
+          {% for var in variations %}
+          <label class="inline-flex items-center space-x-1">
+            <input type="checkbox" name="variations" value="{{ var }}"
+                   class="h-4 w-4 border-gray-300 rounded focus:ring-blue-500">
+            <span class="ml-2 text-gray-700">{{ var }}</span>
+            <button type="button"
+                    data-key="{{ var }}"
+                    class="tooltip-icon text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <i class="fas fa-info-circle fa-sm"></i>
+            </button>
+          </label>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
-      <div class="form-group">
-        <label>Magnitudes (comma-separated percentages, one per variation)</label>
-        <input type="text" class="form-control" name="magnitudes" placeholder="e.g. 10,20" required>
+      <div>
+        <label class="block text-gray-700 font-medium mb-2">
+          Magnitudes
+          <button type="button"
+                  data-key="magnitudes"
+                  class="tooltip-icon ml-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <i class="fas fa-info-circle"></i>
+          </button>
+        </label>
+        <div id="magnitudes-container"></div>
+        <p class="text-gray-500 text-sm">Provide magnitude (%) for each variation you select above.</p>
       </div>
-      <button type="submit" class="btn btn-primary">Run Audit</button>
+      <button type="submit"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+        Run Audit
+      </button>
     </form>
   </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const container = document.getElementById('magnitudes-container');
+      function updateMagnitudeFields() {
+        container.innerHTML = '';
+        document.querySelectorAll('input[name="variations"]:checked').forEach(function(input) {
+          const variation = input.value;
+          const fieldId = 'magnitude_' + variation;
+          const group = document.createElement('div');
+          group.className = 'mb-4';
+          const label = document.createElement('label');
+          label.htmlFor = fieldId;
+          label.className = 'block text-gray-700 text-sm font-medium mb-1';
+          label.textContent = variation.charAt(0).toUpperCase() + variation.slice(1) + ' Magnitude (%)';
+          const field = document.createElement('input');
+          field.type = 'number';
+          field.className = 'shadow border border-gray-300 rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500';
+          field.id = fieldId;
+          field.name = 'magnitudes';
+          field.min = 0;
+          field.required = true;
+          group.appendChild(label);
+          group.appendChild(field);
+          container.appendChild(group);
+        });
+      }
+      document.querySelectorAll('input[name="variations"]').forEach(function(input) {
+        input.addEventListener('change', updateMagnitudeFields);
+      });
+    });
+  </script>
+
+  <!-- Tooltip Sidebar & Overlay -->
+  <div id="tooltip-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40"></div>
+  <div id="tooltip-sidebar"
+       class="fixed inset-y-0 right-0 w-96 bg-white shadow-lg transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
+    <div class="p-4 flex justify-between items-center border-b border-gray-200">
+      <h2 id="tooltip-title" class="text-lg font-bold text-gray-900">Info</h2>
+      <button id="tooltip-close-btn" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div id="tooltip-content" class="p-4 overflow-y-auto flex-1 text-gray-700"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Tooltip data mapping
+      const tooltipData = {
+        data: {
+          title: 'Data CSV',
+          content: `<p>Upload a CSV with two columns: <code>prompt</code> and <code>essay</code>. Each row is one essay prompt/response pair.</p>`
+        },
+        model: {
+          title: 'Model Script',
+          content: `<p>This is a Python file defining your grading function. It must contain a callable, e.g., <code>def grade(prompt, essay): ...</code>.</p>`
+        },
+        model_func: {
+          title: 'Function Name',
+          content: `<p>The name of the function in your model script to call for grading (default is <code>grade</code>).</p>`
+        },
+        variations: {
+          title: 'Variations',
+          content: `<p>Select one or more text variations to test. Examples:</p>
+          <ul class="list-disc list-inside">
+            <li><strong>spelling</strong>: introduce common typos.</li>
+            <li><strong>cognates</strong>: swap words with their cognates.</li>
+          </ul>`
+        },
+        magnitudes: {
+          title: 'Magnitudes',
+          content: `<p>Enter a numeric percentage for each selected variation. This controls the intensity of the variation.</p>`
+        },
+        spelling: {
+          title: 'Spelling Variation',
+          content: `<p>Introduce common typos into the essay, e.g., <em>the</em> → <em>teh</em>.</p>`
+        },
+        pio: {
+          title: 'Pronoun Variation',
+          content: `<p>Change pronouns to test gender bias, e.g., <em>he</em> → <em>she</em>.</p>`
+        },
+        cognates: {
+          title: 'Cognate Variation',
+          content: `<p>Replace words with their etymological cognates, e.g., <em>teacher</em> → <em>docent</em>.</p>`
+        },
+        noun_transfer: {
+          title: 'Noun Transfer',
+          content: `<p>Swap key nouns to test topic bias, e.g., <em>mathematics</em> → <em>history</em>.</p>`
+        },
+        spanglish: {
+          title: 'Spanglish',
+          content: `<p>Mix in Spanish borrowings to test language bias, e.g., <em>hello</em> → <em>hola</em>.</p>`
+        }
+      };
+
+      const overlay = document.getElementById('tooltip-overlay');
+      const sidebar = document.getElementById('tooltip-sidebar');
+      const titleEl = document.getElementById('tooltip-title');
+      const contentEl = document.getElementById('tooltip-content');
+      const closeBtn = document.getElementById('tooltip-close-btn');
+
+      document.querySelectorAll('.tooltip-icon').forEach(icon => {
+        icon.addEventListener('click', () => {
+          const key = icon.dataset.key;
+          const info = tooltipData[key];
+          if (!info) return;
+          titleEl.textContent = info.title;
+          contentEl.innerHTML = info.content;
+          overlay.classList.remove('hidden');
+          sidebar.classList.remove('translate-x-full');
+        });
+      });
+
+      function closeSidebar() {
+        sidebar.classList.add('translate-x-full');
+        overlay.classList.add('hidden');
+      }
+      overlay.addEventListener('click', closeSidebar);
+      closeBtn.addEventListener('click', closeSidebar);
+    });
+  </script>
 </body>
 </html>

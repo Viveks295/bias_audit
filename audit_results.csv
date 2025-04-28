@@ -1,0 +1,11 @@
+index,variation,magnitude,original_grade,perturbed_grade,difference
+0,spelling,30,0.059,0.185,0.126
+1,spelling,30,0.941,0.581,-0.36
+2,spelling,30,0.665,0.699,0.03399999999999992
+3,spelling,30,0.7,0.123,-0.577
+4,spelling,30,0.872,0.179,-0.6930000000000001
+0,spanglish,50,0.059,0.615,0.556
+1,spanglish,50,0.941,0.917,-0.02399999999999991
+2,spanglish,50,0.665,0.748,0.08299999999999996
+3,spanglish,50,0.7,0.95,0.25
+4,spanglish,50,0.872,0.677,-0.19499999999999995

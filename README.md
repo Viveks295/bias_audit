@@ -47,6 +47,21 @@ report = auditor.audit(variations, magnitudes)
 print(report.head())
 ```
 
+## Preview Variations
+
+Before running a full audit, you can preview a few samples of how a variation affects your essays:
+
+```python
+# Preview a few samples of perturbed essays for the 'spelling' variation
+samples = auditor.preview_variation(
+    variation_name='spelling',
+    magnitude=30,
+    n_samples=5,
+    random_state=42,
+)
+print(samples)
+```
+
 ## CLI
 
 ```bash

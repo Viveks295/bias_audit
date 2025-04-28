@@ -46,3 +46,18 @@ def test_perturb_and_audit(monkeypatch, df, varname):
     assert 'difference' in report.columns
     # Should have one row per essay
     assert len(report) == len(df)
+    
+def test_preview_variation(monkeypatch, df):
+    # Stub the 'spelling' variation to apply a simple reversible transform (reverse text)
+    variation = get_variation('spelling')
+    monkeypatch.setattr(variation, 'apply', lambda text, magnitude: text[::-1])
+    aud = Auditor(dummy_model, df)
+    # Preview two samples with a fixed random state for reproducibility
+    samples = aud.preview_variation('spelling', magnitude=50, n_samples=2, random_state=0)
+    # Should return a DataFrame with expected columns
+    assert isinstance(samples, pd.DataFrame)
+    expected_cols = {'index', 'prompt', 'original_essay', 'perturbed_essay'}
+    assert set(samples.columns) == expected_cols
+    # Each perturbed essay should be the reverse of the original
+    for _, row in samples.iterrows():
+        assert row['perturbed_essay'] == row['original_essay'][::-1]

@@ -16,3 +16,5 @@ essay_bias_audit/variations/noun_transfer.py
 essay_bias_audit/variations/pio.py
 essay_bias_audit/variations/spanglish.py
 essay_bias_audit/variations/spelling.py
+tests/test_auditor.py
+tests/test_cli.py
