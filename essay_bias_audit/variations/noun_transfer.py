@@ -3,7 +3,7 @@ import nltk
 from deep_translator import GoogleTranslator
 from .base import Variation
 
-# Translator instance (uses free Google Translate)
+# Translator instance 
 translator = GoogleTranslator(source='auto', target='es')
 
 class NounTransferVariation(Variation):
@@ -20,9 +20,7 @@ class NounTransferVariation(Variation):
         Returns:
             Transformed text.
         """
-        # TODO: implement noun transfer based on magnitude
         def translate_word(word):
-            # Use deep-translator GoogleTranslate under the hood
             return translator.translate(word)
 
         def noun(word, tag):

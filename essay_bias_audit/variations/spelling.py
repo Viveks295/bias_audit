@@ -15,15 +15,13 @@ class SpellingVariation(Variation):
         Returns:
             Text with spelling errors.
         """
-        # TODO: implement spelling perturbation based on magnitude
-        # Determine error rate from magnitude (0-100)
         error_rate = magnitude / 100.0
         words = text.split()
         num_errors = int(len(words) * error_rate)
         error_indices = random.sample(range(len(words)), num_errors)
 
-        def corrupt_word(word):
-            if len(word) <= 1 or word.startswith("@"):  # Skip single-character words
+        def misspell_word(word):
+            if len(word) <= 1:  
                 return word
             error_type = random.choice(["swap", "replace", "delete", "insert"])
             if error_type == "swap" and len(word) > 1:
@@ -42,7 +40,7 @@ class SpellingVariation(Variation):
                 return word[:i] + char + word[i:]
             return word
 
-        corrupted_words = [
-            corrupt_word(word) if i in error_indices else word for i, word in enumerate(words)
+        misspelled_words = [
+            misspell_word(word) if i in error_indices else word for i, word in enumerate(words)
         ]
-        return " ".join(corrupted_words)
+        return " ".join(misspelled_words)

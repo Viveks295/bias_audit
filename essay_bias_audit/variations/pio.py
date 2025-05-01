@@ -16,8 +16,6 @@ class PioVariation(Variation):
         Returns:
             Transformed text.
         """
-        # TODO: implement PIO transformation based on magnitude
-        # Error rate from magnitude (0-100)
         error_rate = magnitude / 100.0
         substitutions = [
         # Vowel substitutions
@@ -42,9 +40,6 @@ class PioVariation(Variation):
 
         # Consonant cluster adjustments
         (r'\b(s[ptlrcmn])', r'es\1'),
-
-        # Final consonant adjustments
-        # (r'([b-df-hj-np-tv-z])\b', r'\1e'),
 
         # Double consonants
         (r'([a-zA-Z])\1', r'\1'),

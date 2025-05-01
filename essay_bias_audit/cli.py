@@ -7,7 +7,7 @@ import pandas as pd
 from .auditor import Auditor
 
 @click.command()
-@click.option('--data', required=True, type=click.Path(exists=True), help='Path to CSV file with prompt and essay columns')
+@click.option('--data', required=True, type=click.Path(exists=True), help='Path to CSV file with text column')
 @click.option('--model-script', required=True, type=click.Path(exists=True), help='Path to Python script defining the grading function')
 @click.option('--model-func', default='grade', help='Name of the grading function in the script')
 @click.option('--variations', multiple=True, required=True, help='Variations to apply (e.g., spelling, spanglish)')
@@ -15,7 +15,7 @@ from .auditor import Auditor
 @click.option('--output', default='audit_results.csv', help='Output CSV file for audit results')
 def main(data, model_script, model_func, variations, magnitudes, output):
     """
-    CLI for running an essay bias audit.
+    CLI for running an text bias audit.
     """
     if len(variations) != len(magnitudes):
         click.echo('Error: The number of variations must match the number of magnitudes.', err=True)
@@ -36,5 +36,5 @@ def main(data, model_script, model_func, variations, magnitudes, output):
     report.to_csv(output, index=False)
     click.echo(f'Audit results saved to {output}')
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == '__main__':  
     main()

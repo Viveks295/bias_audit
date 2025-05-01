@@ -6,8 +6,6 @@ from .base import Variation
 
 # Cache for translations
 cognate_cache = {}
-
-# Translator instance (uses free Google Translate)
 translator = GoogleTranslator(source='auto', target='es')
 
 class CognatesVariation(Variation):
@@ -24,11 +22,8 @@ class CognatesVariation(Variation):
         Returns:
             Text with cognate replacements.
         """
-        # Error rate from magnitude (0-100)
         error_rate = magnitude / 100.0
-        # TODO: implement cognate replacements based on magnitude
         def translate_word(word):
-            # Use deep-translator Google Translate under the hood
             return translator.translate(word)
 
         def is_cognate(eng_word, esp_word, threshold=0.7):
@@ -48,9 +43,7 @@ class CognatesVariation(Variation):
         candidate_translations = {}
 
         for index, token in enumerate(tokens):
-            # Only consider alphabetic tokens.
             if token.isalpha():
-                # Check cache first.
                 if token in cognate_cache:
                     translation, is_candidate = cognate_cache[token]
                 else:
