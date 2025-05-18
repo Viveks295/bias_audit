@@ -1,6 +1,6 @@
 import random
 
 
-def grade(prompt, essay):
+def grade(essay):
     return round(random.uniform(0, 1), 3)
 
