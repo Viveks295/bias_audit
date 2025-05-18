@@ -1,6 +1,6 @@
-# essay_bias_audit
+# AI Bias Audit
 
-A Python package to audit bias in essay grading models. It allows users to grade essays with their model, apply
+A Python package to audit bias in AI grading models. It allows users to grade essays with their model, apply
 text variations (e.g., spelling errors, noun transfer), and analyze how these variations affect model grading.
 
 ## Installation
@@ -27,12 +27,12 @@ from essay_bias_audit.auditor import Auditor
 # Load data
 df = pd.read_csv('essays.csv')
 
-# Define grading model: function taking (prompt, essay) and returning grade
-def my_model(prompt, essay):
+# Define grading model: function taking (text) and returning grade
+def my_model(text):
     # model code here
     return ...
 
-# Create auditor and grade original essays
+# Create auditor and grade original texts
 auditor = Auditor(model=my_model, data=df)
 original_grades = auditor.grade()
 print('Accuracy:', auditor.accuracy())
@@ -46,7 +46,7 @@ print(report.head())
 
 ## Preview Variations
 
-Before running a full audit, you can preview a few samples of how a variation affects your essays:
+Before running a full audit, you can preview a few samples of how a variation affects your text:
 
 ```python
 # Preview a few samples of perturbed essays for the 'spelling' variation
