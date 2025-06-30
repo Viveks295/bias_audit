@@ -63,13 +63,14 @@ class Auditor:
         df['text'] = df['text'].apply(lambda text: variation.apply(text, magnitude))
         return df
 
-    def audit(self, variations: list, magnitudes: list) -> pd.DataFrame:
+    def audit(self, variations: list, magnitudes: list, score_cutoff: float = None) -> pd.DataFrame:
         """
         Run the bias audit by applying each variation and recording grade changes.
 
         Args:
             variations: List of variation names.
             magnitudes: List of magnitudes corresponding to each variation.
+            score_cutoff: Optional float. If provided, only texts with original grades >= this value are audited.
         Returns:
             DataFrame summarizing original and perturbed grades.
         """
@@ -80,10 +81,21 @@ class Auditor:
         original = self.grade()
         original = original[['predicted_grade']].rename(columns={'predicted_grade': 'original_grade'})
 
+        # Apply score cutoff filter if specified
+        if score_cutoff is not None:
+            keep_idx = original[original['original_grade'] >= score_cutoff].index
+            original = original.loc[keep_idx]
+            filtered_data = self.data.loc[keep_idx].reset_index(drop=True)
+        else:
+            filtered_data = self.data.copy()
+
         results = []
         for variation_name, mag in zip(variations, magnitudes):
-            perturbed_df = self.perturb(variation_name, mag)
-            scored = self.grade(texts=perturbed_df)
+            # Use filtered data for perturbation
+            df_to_perturb = filtered_data.copy()
+            variation = get_variation(variation_name)
+            df_to_perturb['text'] = df_to_perturb['text'].apply(lambda text: variation.apply(text, mag))
+            scored = self.grade(texts=df_to_perturb)
             for idx, orig_row in original.iterrows():
                 pert_grade = scored.loc[idx, 'predicted_grade']
                 orig_grade = orig_row['original_grade']
