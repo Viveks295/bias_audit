@@ -1,16 +1,16 @@
 import pandas as pd
 import pytest
 from click.testing import CliRunner
-from essay_bias_audit.cli import main
+from ai_bias_audit.cli import main
 
 import nltk
 # Stub NLTK to avoid external data downloads
 nltk.word_tokenize = lambda text: text.split()
 nltk.pos_tag = lambda tokens: [(w, 'NN') for w in tokens]
 nltk.sent_tokenize = lambda text: [text]
-import essay_bias_audit.variations.cognates as cognates_mod
-import essay_bias_audit.variations.noun_transfer as noun_mod
-import essay_bias_audit.variations.spanglish as spang_mod
+import ai_bias_audit.variations.cognates as cognates_mod
+import ai_bias_audit.variations.noun_transfer as noun_mod
+import ai_bias_audit.variations.spanglish as spang_mod
 
 class DummyTranslator:
     def translate(self, text):

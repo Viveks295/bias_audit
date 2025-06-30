@@ -11,7 +11,7 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
-from essay_bias_audit.auditor import Auditor   # ← your package
+from ai_bias_audit.auditor import Auditor   # ← your package
 
 # ────────────────────────── Flask app setup ──────────────────────────
 app = Flask(__name__)

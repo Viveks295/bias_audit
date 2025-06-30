@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='essay_bias_audit',
+    name='ai_bias_audit',
     version='0.1.0',
     packages=find_packages(),
     install_requires=[
@@ -21,7 +21,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'essay-bias-audit=essay_bias_audit.cli:main',
+            'ai-bias-audit=ai_bias_audit.cli:main',
         ],
     },
     python_requires='>=3.6',

@@ -22,7 +22,7 @@ EOF
 
 ```python
 import pandas as pd
-from essay_bias_audit.auditor import Auditor
+from ai_bias_audit.auditor import Auditor
 
 # Load data
 df = pd.read_csv('essays.csv')
@@ -62,7 +62,7 @@ print(samples)
 ## CLI
 
 ```bash
-essay-bias-audit --data essays.csv --model-script model.py --model-func grade \
+ai-bias-audit --data essays.csv --model-script model.py --model-func grade \
   --variations spelling --magnitudes 30 \
   --variations spanglish --magnitudes 50 \
   --output audit_results.csv

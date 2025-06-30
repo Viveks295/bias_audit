@@ -1,12 +1,14 @@
 import pandas as pd
 import pytest
 import nltk
+import random
+import numpy as np
 # Stub NLTK to avoid needing external data
 nltk.word_tokenize = lambda text: text.split()
 nltk.pos_tag = lambda tokens: [(w, 'NN') for w in tokens]
 nltk.sent_tokenize = lambda text: [text]
-from essay_bias_audit.auditor import Auditor
-from essay_bias_audit.variations import get_variation
+from ai_bias_audit.auditor import Auditor
+from ai_bias_audit.variations import get_variation
 
 @pytest.fixture
 def df():

@@ -2,4 +2,4 @@ Flask
 pandas
 nltk
 deep-translator
-essay_bias_audit
+ai_bias_audit
