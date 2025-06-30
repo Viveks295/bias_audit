@@ -84,10 +84,11 @@ class Auditor:
         # Apply score cutoff filter if specified
         if score_cutoff is not None:
             keep_idx = original[original['original_grade'] >= score_cutoff].index
-            original = original.loc[keep_idx]
+            original = original.loc[keep_idx].reset_index(drop=True)
             filtered_data = self.data.loc[keep_idx].reset_index(drop=True)
         else:
-            filtered_data = self.data.copy()
+            filtered_data = self.data.copy().reset_index(drop=True)
+            original = original.reset_index(drop=True)
 
         results = []
         for variation_name, mag in zip(variations, magnitudes):

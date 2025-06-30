@@ -14,13 +14,13 @@ from ai_bias_audit.variations import get_variation
 def df():
     return pd.DataFrame({
         'prompt': ['Q1', 'Q2'],
-        'essay': ['abc', 'def'],
+        'text': ['abc', 'def'],
         'true_grade': [3, 3],
     })
 
-def dummy_model(prompt, essay):
-    # Simple model: grade = length of essay
-    return len(essay)
+def dummy_model(text):
+    # Simple model: grade = length of text
+    return len(text)
 
 def test_grade_and_accuracy(df):
     aud = Auditor(dummy_model, df)
@@ -40,13 +40,13 @@ def test_perturb_and_audit(monkeypatch, df, varname):
         monkeypatch.setattr(variation, 'translate_phrase', lambda p: p.upper())
     aud = Auditor(dummy_model, df)
     pert_df = aud.perturb(varname, magnitude=50)
-    # Should return a DataFrame with 'essay' column
+    # Should return a DataFrame with 'text' column
     assert isinstance(pert_df, pd.DataFrame)
-    assert 'essay' in pert_df.columns
+    assert 'text' in pert_df.columns
     # Run full audit
     report = aud.audit([varname], [50])
     assert 'difference' in report.columns
-    # Should have one row per essay
+    # Should have one row per text
     assert len(report) == len(df)
     
 def test_preview_variation(monkeypatch, df):
@@ -58,8 +58,30 @@ def test_preview_variation(monkeypatch, df):
     samples = aud.preview_variation('spelling', magnitude=50, n_samples=2, random_state=0)
     # Should return a DataFrame with expected columns
     assert isinstance(samples, pd.DataFrame)
-    expected_cols = {'index', 'prompt', 'original_essay', 'perturbed_essay'}
+    expected_cols = {'index', 'prompt', 'original_text', 'perturbed_text'}
     assert set(samples.columns) == expected_cols
-    # Each perturbed essay should be the reverse of the original
+    # Each perturbed text should be the reverse of the original
     for _, row in samples.iterrows():
-        assert row['perturbed_essay'] == row['original_essay'][::-1]
+        assert row['perturbed_text'] == row['original_text'][::-1]
+
+def test_grade(auditor):
+    df = auditor.grade()
+    assert 'predicted_grade' in df.columns
+    assert len(df) == 3
+
+
+def test_score_cutoff(auditor):
+    # Only rows with original grade >= 1 should be included
+    result = auditor.audit(['spelling'], [10], score_cutoff=1)
+    result = result.reset_index(drop=True)
+    if result.empty:
+        assert False, 'Result should not be empty for cutoff=1 with grades [1,0,1]'
+    else:
+        assert all(result['original_grade'] >= 1)
+        assert set(result['original_grade']) == {1}
+
+
+def test_audit_output_columns(auditor):
+    result = auditor.audit(['spelling'], [10])
+    expected_cols = {'index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'difference'}
+    assert expected_cols.issubset(result.columns)
