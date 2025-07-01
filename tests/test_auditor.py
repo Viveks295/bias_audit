@@ -92,3 +92,16 @@ def test_bias_measures_present(auditor):
         assert col in result.columns
         # All values should be finite (not inf or nan)
         assert result[col].apply(lambda x: x == x and x != float('inf') and x != float('-inf')).all()
+
+def test_audit_moments(auditor):
+    auditor.audit(['spelling', 'cognates'], [10, 10])
+    moments = auditor.audit_moments()
+    # Check that the DataFrame has the correct columns
+    for col in ['bias_0_mean', 'bias_0_var', 'bias_0_skew',
+                'bias_1_mean', 'bias_1_var', 'bias_1_skew',
+                'bias_2_mean', 'bias_2_var', 'bias_2_skew',
+                'bias_3_mean', 'bias_3_var', 'bias_3_skew']:
+        assert col in moments.columns
+    # Should have one row per (variation, magnitude)
+    assert set(moments['variation']) == {'spelling', 'cognates'}
+    assert set(moments['magnitude']) == {10}

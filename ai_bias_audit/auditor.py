@@ -1,6 +1,7 @@
 import pandas as pd
 from .variations import get_variation
 from .features import count_words, count_nouns, count_cognates
+from scipy.stats import skew
 
 class Auditor:
     """
@@ -184,3 +185,25 @@ class Auditor:
         else:
             sample_df = df_preview.sample(n=n)
         return sample_df.reset_index(drop=True)
+
+    def audit_moments(self) -> pd.DataFrame:
+        """
+        Return a DataFrame with mean, variance, and skewness for each bias measure, grouped by variation and magnitude.
+        Returns:
+            DataFrame with columns: variation, magnitude, bias_X_mean, bias_X_var, bias_X_skew for X in 0,1,2,3
+        """
+        if self.results is None or self.results.empty:
+            raise ValueError("No audit results available. Run audit() first.")
+        moments = []
+        group_cols = ['variation', 'magnitude']
+        bias_cols = ['bias_0', 'bias_1', 'bias_2', 'bias_3']
+        grouped = self.results.groupby(group_cols)
+        for (variation, magnitude), group in grouped:
+            row = {'variation': variation, 'magnitude': magnitude}
+            for col in bias_cols:
+                vals = group[col].dropna()
+                row[f'{col}_mean'] = vals.mean()
+                row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
+                row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
+            moments.append(row)
+        return pd.DataFrame(moments)
