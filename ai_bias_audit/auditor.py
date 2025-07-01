@@ -72,7 +72,7 @@ class Auditor:
         df['text'] = df['text'].apply(lambda text: variation.apply(text, magnitude))
         return df
 
-    def audit(self, variations: list, magnitudes: list, score_cutoff: float = None) -> pd.DataFrame:
+    def audit(self, variations: list, magnitudes: list, score_cutoff: float = None, group_col: str = None) -> pd.DataFrame:
         """
         Run the bias audit by applying each variation and recording grade changes.
 
@@ -80,8 +80,9 @@ class Auditor:
             variations: List of variation names.
             magnitudes: List of magnitudes corresponding to each variation.
             score_cutoff: Optional float. If provided, only texts with original grades >= this value are audited.
+            group_col: Optional str. Name of the column to use for group/demographic analysis.
         Returns:
-            DataFrame summarizing original and perturbed grades, including additional bias measures.
+            DataFrame summarizing original and perturbed grades, including additional bias measures and group info if provided.
         """
         if len(variations) != len(magnitudes):
             raise ValueError("Variations and magnitudes must have the same length.")
@@ -99,6 +100,13 @@ class Auditor:
             filtered_data = self.data.copy().reset_index(drop=True)
             original = original.reset_index(drop=True)
 
+        # Prepare group values if needed
+        group_vals = None
+        if group_col is not None and group_col in filtered_data.columns:
+            group_vals = filtered_data[group_col].fillna('unknown').tolist()
+        elif group_col is not None:
+            group_vals = ['unknown'] * len(filtered_data)
+
         results = []
         for variation_name, mag in zip(variations, magnitudes):
             # Use filtered data for perturbation
@@ -109,14 +117,17 @@ class Auditor:
             for idx, orig_row in original.iterrows():
                 pert_grade = scored.loc[idx, 'predicted_grade']
                 orig_grade = orig_row['original_grade']
-                results.append({
+                row = {
                     'index': idx,
                     'variation': variation_name,
                     'magnitude': mag,
                     'original_grade': orig_grade,
                     'perturbed_grade': pert_grade,
                     'difference': pert_grade - orig_grade,
-                })
+                }
+                if group_vals is not None:
+                    row['group'] = group_vals[idx] if idx < len(group_vals) else 'unknown'
+                results.append(row)
         self.results = pd.DataFrame(results)
 
         # --- Additional bias measures ---
@@ -186,20 +197,27 @@ class Auditor:
             sample_df = df_preview.sample(n=n)
         return sample_df.reset_index(drop=True)
 
-    def audit_moments(self) -> pd.DataFrame:
+    def audit_moments(self, group_col: str = None) -> pd.DataFrame:
         """
-        Return a DataFrame with mean, variance, and skewness for each bias measure, grouped by variation and magnitude.
+        Return a DataFrame with mean, variance, and skewness for each bias measure, grouped by variation, magnitude, and group (if provided).
+        Args:
+            group_col: Optional str. Name of the column to use for group/demographic analysis.
         Returns:
-            DataFrame with columns: variation, magnitude, bias_X_mean, bias_X_var, bias_X_skew for X in 0,1,2,3
+            DataFrame with columns: variation, magnitude, [group], bias_X_mean, bias_X_var, bias_X_skew for X in 0,1,2,3
         """
         if self.results is None or self.results.empty:
             raise ValueError("No audit results available. Run audit() first.")
         moments = []
         group_cols = ['variation', 'magnitude']
+        if group_col is not None and 'group' in self.results.columns:
+            group_cols.append('group')
         bias_cols = ['bias_0', 'bias_1', 'bias_2', 'bias_3']
         grouped = self.results.groupby(group_cols)
-        for (variation, magnitude), group in grouped:
-            row = {'variation': variation, 'magnitude': magnitude}
+        for group_keys, group in grouped:
+            if isinstance(group_keys, tuple):
+                row = dict(zip(group_cols, group_keys))
+            else:
+                row = {group_cols[0]: group_keys}
             for col in bias_cols:
                 vals = group[col].dropna()
                 row[f'{col}_mean'] = vals.mean()

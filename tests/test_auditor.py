@@ -105,3 +105,18 @@ def test_audit_moments(auditor):
     # Should have one row per (variation, magnitude)
     assert set(moments['variation']) == {'spelling', 'cognates'}
     assert set(moments['magnitude']) == {10}
+
+def test_group_variable_analysis():
+    # Create sample data with a group column
+    df = pd.DataFrame({
+        'text': ['foo', 'bar', 'baz', 'qux'],
+        'true_grade': [1, 0, 1, 0],
+        'group': ['A', 'A', 'B', 'B']
+    })
+    auditor = Auditor(model=lambda text: 1 if 'a' in text else 0, data=df)
+    result = auditor.audit(['spelling'], [10], group_col='group')
+    assert 'group' in result.columns
+    assert set(result['group']) == {'A', 'B'}
+    moments = auditor.audit_moments(group_col='group')
+    assert 'group' in moments.columns
+    assert set(moments['group']) == {'A', 'B'}
