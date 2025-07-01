@@ -85,3 +85,10 @@ def test_audit_output_columns(auditor):
     result = auditor.audit(['spelling'], [10])
     expected_cols = {'index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'difference'}
     assert expected_cols.issubset(result.columns)
+
+def test_bias_measures_present(auditor):
+    result = auditor.audit(['spelling', 'cognates', 'noun_transfer', 'spanglish'], [10, 10, 10, 10])
+    for col in ['bias_0', 'bias_1', 'bias_2', 'bias_3']:
+        assert col in result.columns
+        # All values should be finite (not inf or nan)
+        assert result[col].apply(lambda x: x == x and x != float('inf') and x != float('-inf')).all()

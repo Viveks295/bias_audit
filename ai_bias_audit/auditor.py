@@ -1,5 +1,6 @@
 import pandas as pd
 from .variations import get_variation
+from .features import count_words, count_nouns, count_cognates
 
 class Auditor:
     """
@@ -12,7 +13,7 @@ class Auditor:
         Initialize the Auditor.
 
         Args:
-            model: Callable[[str, str], Any], a function that takes (text) and returns a grade.
+            model: Callable[[str], Any], a function that takes (text) and returns a grade.
             data: pd.DataFrame with column 'text', and optional 'true_grade'.
         """
         self.model = model
@@ -20,6 +21,13 @@ class Auditor:
         if 'text' not in self.data.columns:
             raise ValueError("DataFrame must contain 'text' columns.")
         self.results = None
+        # Add feature columns if not present
+        if 'num_words' not in self.data.columns:
+            self.data['num_words'] = self.data['text'].apply(count_words)
+        if 'num_nouns' not in self.data.columns:
+            self.data['num_nouns'] = self.data['text'].apply(count_nouns)
+        if 'num_cognates' not in self.data.columns:
+            self.data['num_cognates'] = self.data['text'].apply(count_cognates)
 
     def grade(self, texts: pd.DataFrame = None) -> pd.DataFrame:
         """
@@ -72,7 +80,7 @@ class Auditor:
             magnitudes: List of magnitudes corresponding to each variation.
             score_cutoff: Optional float. If provided, only texts with original grades >= this value are audited.
         Returns:
-            DataFrame summarizing original and perturbed grades.
+            DataFrame summarizing original and perturbed grades, including additional bias measures.
         """
         if len(variations) != len(magnitudes):
             raise ValueError("Variations and magnitudes must have the same length.")
@@ -109,6 +117,38 @@ class Auditor:
                     'difference': pert_grade - orig_grade,
                 })
         self.results = pd.DataFrame(results)
+
+        # --- Additional bias measures ---
+        if not self.results.empty:
+            m = self.results['magnitude'] / 100
+            err = self.results['difference']
+            orig = self.results['original_grade']
+            # Map variation to feature column
+            var_to_col = {
+                'spelling': 'num_words',
+                'spanglish': 'num_words',
+                'noun_transfer': 'num_nouns',
+                'cognates': 'num_cognates'
+            }
+            # Get the relevant feature for each row
+            self.results['feature_col'] = self.results['variation'].map(var_to_col)
+            # Use filtered_data for feature values
+            self.results['feature_val'] = [
+                filtered_data.loc[idx, col] if col in filtered_data.columns else 1
+                for idx, col in zip(self.results['index'], self.results['feature_col'])
+            ]
+            self.results['num_words_val'] = [
+                filtered_data.loc[idx, 'num_words'] if 'num_words' in filtered_data.columns else 1
+                for idx in self.results['index']
+            ]
+            self.results['pert'] = self.results['feature_val'] / self.results['num_words_val']
+            # Compute bias measures
+            self.results['bias_0'] = err
+            self.results['bias_1'] = err / m.replace(0, 1e-8)
+            self.results['bias_2'] = err / ((m * self.results['pert']).replace(0, 1e-8) + 0.005)
+            self.results['bias_3'] = err / (1 - orig.replace(1, 1-1e-8))
+            # Drop helper columns
+            self.results.drop(columns=['feature_col', 'feature_val', 'num_words_val', 'pert'], inplace=True)
         return self.results
     
     def preview_variation(
