@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Blueprint
 from flask_cors import CORS
 import pandas as pd
 import tempfile
@@ -8,6 +8,8 @@ from typing import Dict, Any, List
 import importlib.util
 from ai_bias_audit.auditor import Auditor
 from ai_bias_audit.variations import get_variation
+import openai
+import random
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
@@ -15,7 +17,9 @@ CORS(app)  # Enable CORS for React frontend
 # Global storage for audit sessions
 audit_sessions = {}
 
-@app.route('/api/variations', methods=['GET'])
+api = Blueprint('api', __name__)
+
+@api.route('/api/variations', methods=['GET'])
 def get_variations():
     """Get available variations."""
     variations = {
@@ -57,7 +61,7 @@ def get_variations():
     }
     return jsonify(list(variations.values()))
 
-@app.route('/api/preview', methods=['POST'])
+@api.route('/api/preview', methods=['POST'])
 def preview_variation():
     """Preview a variation on sample data."""
     data = request.json
@@ -80,7 +84,7 @@ def preview_variation():
     
     return jsonify(preview_data)
 
-@app.route('/api/audit', methods=['POST'])
+@api.route('/api/audit', methods=['POST'])
 def start_audit():
     """Start a new audit."""
     try:
@@ -157,7 +161,7 @@ def start_audit():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-@app.route('/api/results/<session_id>', methods=['GET'])
+@api.route('/api/results/<session_id>', methods=['GET'])
 def get_results(session_id):
     """Get audit results for a session."""
     if session_id not in audit_sessions:
@@ -186,7 +190,7 @@ def get_results(session_id):
         }
     })
 
-@app.route('/api/download/<session_id>', methods=['GET'])
+@api.route('/api/download/<session_id>', methods=['GET'])
 def download_results(session_id):
     """Download audit results as CSV."""
     if session_id not in audit_sessions:
@@ -217,10 +221,104 @@ def download_results(session_id):
         mimetype='text/csv'
     )
 
-@app.route('/api/health', methods=['GET'])
+@api.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
     return jsonify({'status': 'healthy', 'message': 'AI Bias Audit API is running'})
+
+@api.route('/api/assess_performance', methods=['POST'])
+def assess_performance():
+    # Get files and form data
+    csv_file = request.files.get('csv_file')
+    model_type = request.form.get('model_type')
+    ai_prompt = request.form.get('ai_prompt')
+    rubric = request.form.get('rubric')
+    metric = request.form.get('metric')
+    custom_model_file = request.files.get('custom_model_file')
+
+    if not csv_file or not model_type:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    # Read CSV
+    df = pd.read_csv(csv_file)
+    if 'text' not in df.columns:
+        return jsonify({'error': 'CSV must contain a "text" column'}), 400
+    sample_df = df.sample(n=min(10, len(df)), random_state=42)
+
+    # Prepare results
+    results = []
+    true_grades = []
+    pred_grades = []
+
+    # Custom model grading
+    if model_type == 'custom':
+        if not custom_model_file:
+            return jsonify({'error': 'Custom model file required'}), 400
+        # Save and import the custom model file
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_path = os.path.join(tmpdir, custom_model_file.filename)
+            custom_model_file.save(model_path)
+            spec = importlib.util.spec_from_file_location('custom_model', model_path)
+            custom_model = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(custom_model)
+            # Assume the custom model has a function grade(text: str) -> float/int
+            for _, row in sample_df.iterrows():
+                text = row['text']
+                pred = custom_model.grade(text)
+                pred_grades.append(pred)
+                true = row['true_grade'] if 'true_grade' in row else None
+                if true is not None:
+                    true_grades.append(true)
+                results.append({'text': text, 'predicted_grade': pred, 'true_grade': true})
+    else:
+        # Use OpenAI API for grading
+        openai.api_key = os.environ.get('OPENAI_API_KEY')
+        if not openai.api_key:
+            return jsonify({'error': 'OpenAI API key not set'}), 500
+        for _, row in sample_df.iterrows():
+            text = row['text']
+            prompt = f"{ai_prompt}\nRubric: {rubric}\nText: {text}\nGrade:"
+            try:
+                response = openai.ChatCompletion.create(
+                    model='gpt-4o' if model_type == 'gpt-4o' else 'gpt-4-1106-preview',
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=10,
+                    temperature=0
+                )
+                pred = response['choices'][0]['message']['content'].strip()
+            except Exception as e:
+                pred = f"Error: {str(e)}"
+            pred_grades.append(pred)
+            true = row['true_grade'] if 'true_grade' in row else None
+            if true is not None:
+                true_grades.append(true)
+            results.append({'text': text, 'predicted_grade': pred, 'true_grade': true})
+
+    # Compute metric if possible
+    metric_value = None
+    if true_grades and metric:
+        try:
+            y_true = [float(x) for x in true_grades]
+            y_pred = [float(x) for x in pred_grades]
+            if metric == 'accuracy':
+                metric_value = sum(1 for a, b in zip(y_true, y_pred) if a == b) / len(y_true)
+            elif metric == 'mse':
+                metric_value = sum((a - b) ** 2 for a, b in zip(y_true, y_pred)) / len(y_true)
+            elif metric == 'mae':
+                metric_value = sum(abs(a - b) for a, b in zip(y_true, y_pred)) / len(y_true)
+            elif metric == 'r2':
+                mean_true = sum(y_true) / len(y_true)
+                ss_tot = sum((a - mean_true) ** 2 for a in y_true)
+                ss_res = sum((a - b) ** 2 for a, b in zip(y_true, y_pred))
+                metric_value = 1 - ss_res / ss_tot if ss_tot != 0 else None
+        except Exception:
+            metric_value = None
+
+    return jsonify({
+        'samples': results,
+        'metric': metric,
+        'metric_value': metric_value
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000) 

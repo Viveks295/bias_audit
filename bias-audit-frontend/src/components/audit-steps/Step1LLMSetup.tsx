@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { CloudUpload } from '@mui/icons-material';
 import { AuditState, LLMModel, PerformanceMetric } from '../../types';
+import { auditAPI } from '../../services/api';
 
 interface Step1LLMSetupProps {
   auditState: AuditState;
@@ -24,28 +25,22 @@ interface Step1LLMSetupProps {
 
 const availableLLMs: LLMModel[] = [
   {
-    id: 'gpt-4',
-    name: 'GPT-4',
-    description: 'OpenAI GPT-4 model for text generation and analysis',
+    id: 'gpt-4.1',
+    name: 'GPT-4.1',
+    description: 'OpenAI GPT-4.1 model for text generation and analysis',
     type: 'continuous',
   },
   {
-    id: 'gpt-3.5',
-    name: 'GPT-3.5',
-    description: 'OpenAI GPT-3.5 model for text generation and analysis',
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    description: 'OpenAI GPT-4o model for text generation and analysis',
     type: 'continuous',
   },
   {
-    id: 'custom-binary',
-    name: 'Custom Binary Classifier',
-    description: 'Custom model for binary classification tasks',
-    type: 'binary',
-  },
-  {
-    id: 'custom-continuous',
-    name: 'Custom Continuous Model',
-    description: 'Custom model for continuous prediction tasks',
-    type: 'continuous',
+    id: 'custom',
+    name: 'Custom Model',
+    description: 'Upload your own Python model for custom tasks',
+    type: 'custom',
   },
 ];
 
@@ -109,6 +104,15 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   const [isAssessing, setIsAssessing] = useState(false);
   const [initialPerformance, setInitialPerformance] = useState<number | null>(auditState.initialPerformance);
   const [performanceSatisfactory, setPerformanceSatisfactory] = useState<boolean | null>(auditState.performanceSatisfactory);
+  const [customModelFile, setCustomModelFile] = useState<File | null>(null);
+  const [customModelError, setCustomModelError] = useState<string | null>(null);
+  const [aiPrompt, setAiPrompt] = useState<string>("");
+  const [rubric, setRubric] = useState<string>("");
+  const [assessmentResults, setAssessmentResults] = useState<any[] | null>(null);
+  const [assessmentMetric, setAssessmentMetric] = useState<string | null>(null);
+  const [assessmentMetricValue, setAssessmentMetricValue] = useState<number | null>(null);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
+  const [assessmentSkipped, setAssessmentSkipped] = useState<boolean>(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -139,8 +143,24 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   const handleLLMChange = (llmId: string) => {
     const llm = availableLLMs.find(l => l.id === llmId);
     setSelectedLLM(llm || null);
-    setOutcomeType(llm?.type || null);
+    setOutcomeType(null);
     setSelectedMetric(null);
+    setCustomModelFile(null);
+    setCustomModelError(null);
+    setAiPrompt("");
+    setRubric("");
+  };
+
+  const handleCustomModelUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith('.py')) {
+      setCustomModelError('Please upload a Python (.py) file');
+      setCustomModelFile(null);
+      return;
+    }
+    setCustomModelFile(file);
+    setCustomModelError(null);
   };
 
   const handleMetricChange = (metricId: string) => {
@@ -149,21 +169,59 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   };
 
   const handleAssessPerformance = async () => {
-    if (!selectedLLM || !selectedMetric) return;
-
+    if (!selectedLLM || !selectedMetric || !uploadedFile) return;
     setIsAssessing(true);
-    
-    // Simulate API call to assess performance
-    setTimeout(() => {
-      const performance = Math.random() * 0.4 + 0.6; // Random performance between 0.6-1.0
-      setInitialPerformance(performance);
-      setPerformanceSatisfactory(performance >= 0.7);
+    setAssessmentError(null);
+    setAssessmentResults(null);
+    setAssessmentMetric(null);
+    setAssessmentMetricValue(null);
+    setAssessmentSkipped(false);
+    try {
+      const response = await auditAPI.assessPerformance({
+        csvFile: uploadedFile,
+        modelType: selectedLLM.id,
+        aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
+        rubric: selectedLLM.id !== 'custom' ? rubric : undefined,
+        metric: selectedMetric.id,
+        customModelFile: selectedLLM.id === 'custom' ? customModelFile || undefined : undefined,
+      });
+      setAssessmentResults(response.samples);
+      setAssessmentMetric(response.metric);
+      setAssessmentMetricValue(response.metric_value);
+      // Set initial performance and satisfactory if metric is available
+      if (typeof response.metric_value === 'number') {
+        setInitialPerformance(response.metric_value);
+        setPerformanceSatisfactory(response.metric_value >= 0.7);
+      } else {
+        setInitialPerformance(null);
+        setPerformanceSatisfactory(null);
+      }
+    } catch (err: any) {
+      setAssessmentError(err?.response?.data?.error || err.message || 'Error assessing performance');
+    } finally {
       setIsAssessing(false);
-    }, 2000);
+    }
+  };
+
+  const handleSkipAssessment = () => {
+    setAssessmentSkipped(true);
+    setInitialPerformance(null);
+    setPerformanceSatisfactory(null);
+    setAssessmentResults(null);
+    setAssessmentMetric(null);
+    setAssessmentMetricValue(null);
   };
 
   const handleNext = () => {
-    if (uploadedFile && selectedLLM && outcomeType && selectedMetric && initialPerformance !== null && performanceSatisfactory !== null) {
+    if (
+      uploadedFile &&
+      selectedLLM &&
+      outcomeType &&
+      ((selectedLLM.id === 'custom' && customModelFile) ||
+        ((selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && aiPrompt)) &&
+      selectedMetric &&
+      (assessmentSkipped || assessmentResults)
+    ) {
       onComplete({
         uploadedFile,
         filePreview,
@@ -172,12 +230,22 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         selectedMetric,
         initialPerformance,
         performanceSatisfactory,
+        customModelFile: selectedLLM.id === 'custom' ? customModelFile : undefined,
+        aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
+        rubric: selectedLLM.id !== 'custom' && rubric ? rubric : undefined,
       });
       onNext();
     }
   };
 
-  const canProceed = uploadedFile && selectedLLM && outcomeType && selectedMetric && initialPerformance !== null && performanceSatisfactory !== null;
+  const canProceed =
+    uploadedFile &&
+    selectedLLM &&
+    outcomeType &&
+    ((selectedLLM.id === 'custom' && customModelFile) ||
+      ((selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && aiPrompt)) &&
+    selectedMetric &&
+    (assessmentSkipped || assessmentResults);
 
   return (
     <Box>
@@ -281,7 +349,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              2. Choose Your LLM
+              2. Choose Your Model
             </Typography>
             <FormControl fullWidth>
               <InputLabel>Language Model</InputLabel>
@@ -303,6 +371,55 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                 ))}
               </Select>
             </FormControl>
+
+            {/* Conditional UI for Custom Model or GPT models */}
+            {selectedLLM?.id === 'custom' && (
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  fullWidth
+                >
+                  Upload Python Model (.py)
+                  <input
+                    type="file"
+                    accept=".py"
+                    hidden
+                    onChange={handleCustomModelUpload}
+                  />
+                </Button>
+                {customModelFile && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Uploaded: {customModelFile.name}
+                  </Typography>
+                )}
+                {customModelError && (
+                  <Alert severity="error" sx={{ mt: 1 }}>{customModelError}</Alert>
+                )}
+              </Box>
+            )}
+            {(selectedLLM?.id === 'gpt-4.1' || selectedLLM?.id === 'gpt-4o') && (
+              <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel shrink>Model AI Prompt</InputLabel>
+                  <textarea
+                    style={{ width: '100%', minHeight: 60, fontFamily: 'inherit', fontSize: '1rem', padding: 8 }}
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    placeholder="Enter the prompt you will use for the AI model"
+                  />
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel shrink>Rubric (Optional)</InputLabel>
+                  <textarea
+                    style={{ width: '100%', minHeight: 60, fontFamily: 'inherit', fontSize: '1rem', padding: 8 }}
+                    value={rubric}
+                    onChange={e => setRubric(e.target.value)}
+                    placeholder="Enter the grading rubric for the model"
+                  />
+                </FormControl>
+              </Box>
+            )}
           </CardContent>
         </Card>
 
@@ -374,20 +491,67 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                 >
                   {isAssessing ? 'Assessing...' : 'Assess Performance'}
                 </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={handleSkipAssessment}
+                  disabled={isAssessing}
+                  sx={{ ml: 2 }}
+                >
+                  Skip Assessment
+                </Button>
                 {initialPerformance !== null && (
                   <Typography variant="body1">
                     Performance: {(initialPerformance * 100).toFixed(1)}%
                   </Typography>
                 )}
               </Box>
-              
-              {initialPerformance !== null && (
-                <Alert severity={performanceSatisfactory ? 'success' : 'warning'}>
-                  {performanceSatisfactory 
-                    ? 'Performance is satisfactory. You can proceed with the audit.'
-                    : 'Performance is below threshold. Consider improving your model before auditing.'
-                  }
+              {assessmentError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{assessmentError}</Alert>
+              )}
+              {assessmentSkipped && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  You skipped performance assessment. Bias model might not be accurate if model performance is low.
                 </Alert>
+              )}
+              {assessmentResults && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Sampled Grading Results:
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Text</th>
+                          <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Predicted Grade</th>
+                          {assessmentResults.some(r => r.true_grade !== undefined && r.true_grade !== null) && (
+                            <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>True Grade</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assessmentResults.map((row, idx) => (
+                          <tr key={idx}>
+                            <td style={{ verticalAlign: 'top', padding: '4px 8px', maxWidth: 300, wordBreak: 'break-word' }}>{row.text}</td>
+                            <td style={{ verticalAlign: 'top', padding: '4px 8px' }}>{row.predicted_grade}</td>
+                            {assessmentResults.some(r => r.true_grade !== undefined && r.true_grade !== null) && (
+                              <td style={{ verticalAlign: 'top', padding: '4px 8px' }}>{row.true_grade ?? ''}</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Paper>
+                  {assessmentMetric && assessmentMetricValue !== null && (
+                    <Alert severity={assessmentMetricValue >= 0.7 ? 'success' : 'warning'} sx={{ mt: 2 }}>
+                      {assessmentMetric.charAt(0).toUpperCase() + assessmentMetric.slice(1)}: {(assessmentMetricValue * 100).toFixed(1)}%<br />
+                      {assessmentMetricValue >= 0.7
+                        ? 'Performance is satisfactory. You can proceed with the audit.'
+                        : 'Performance is below threshold. Consider improving your model before auditing.'}
+                    </Alert>
+                  )}
+                </Box>
               )}
             </CardContent>
           </Card>

@@ -40,7 +40,7 @@ def main():
     
     # Start the Python backend
     print("Starting Python backend...")
-    backend_process = run_command("python api.py", cwd=webapp_dir)
+    backend_process = run_command("python app.py", cwd=webapp_dir)
     
     # Wait a moment for backend to start
     time.sleep(3)

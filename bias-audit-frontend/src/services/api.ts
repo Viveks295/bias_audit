@@ -78,6 +78,30 @@ export const auditAPI = {
     });
     return response.data;
   },
+
+  assessPerformance: async (params: {
+    csvFile: File;
+    modelType: string;
+    aiPrompt?: string;
+    rubric?: string;
+    metric?: string;
+    customModelFile?: File;
+  }) => {
+    const formData = new FormData();
+    formData.append('csv_file', params.csvFile);
+    formData.append('model_type', params.modelType);
+    if (params.aiPrompt) formData.append('ai_prompt', params.aiPrompt);
+    if (params.rubric) formData.append('rubric', params.rubric);
+    if (params.metric) formData.append('metric', params.metric);
+    if (params.customModelFile) formData.append('custom_model_file', params.customModelFile);
+
+    const response = await api.post('/api/assess_performance', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 export default api; 

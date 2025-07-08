@@ -2,7 +2,7 @@ export interface LLMModel {
   id: string;
   name: string;
   description: string;
-  type: 'binary' | 'continuous';
+  type: 'binary' | 'continuous' | 'custom';
 }
 
 export interface PerformanceMetric {
@@ -37,6 +37,9 @@ export interface AuditState {
   selectedMetric: PerformanceMetric | null;
   initialPerformance: number | null;
   performanceSatisfactory: boolean | null;
+  customModelFile?: File | null;
+  aiPrompt?: string;
+  rubric?: string;
   
   // Step 2: Data Filtering
   useScoreCutoff: boolean | null;

@@ -14,10 +14,14 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
 from ai_bias_audit.auditor import Auditor   # ← your package
+from webapp.api import api
+from flask_cors import CORS
 
 # ────────────────────────── Flask app setup ──────────────────────────
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+CORS(app)
+app.register_blueprint(api)
 
 WORKDIR     = tempfile.mkdtemp(prefix="essay_audit_")
 DATA_PATH   = os.path.join(WORKDIR, "data.csv")

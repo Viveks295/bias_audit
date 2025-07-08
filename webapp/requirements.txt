@@ -5,3 +5,4 @@ nltk
 scipy
 deep-translator
 ai_bias_audit
+openai
