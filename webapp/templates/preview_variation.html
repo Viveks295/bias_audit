@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview Text Variations - Bias Audit</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded shadow-md w-full max-w-2xl">
+        <h1 class="text-2xl font-bold mb-4">Preview Text Variations</h1>
+        <form method="POST">
+            {% for preview in previews %}
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold mb-2 capitalize">Variation: {{ preview.variation.replace('_', ' ') }}</h2>
+                    {% if preview.error %}
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-2">
+                            Error: {{ preview.error }}
+                        </div>
+                    {% elif preview.samples %}
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full border border-gray-300 mb-2">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-4 py-2 border">Prompt</th>
+                                        <th class="px-4 py-2 border">Original Text</th>
+                                        <th class="px-4 py-2 border">Perturbed Text</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in preview.samples %}
+                                    <tr>
+                                        <td class="px-4 py-2 border">{{ row.prompt }}</td>
+                                        <td class="px-4 py-2 border">{{ row.original_text }}</td>
+                                        <td class="px-4 py-2 border">{{ row.perturbed_text }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-gray-600">No samples available.</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-2">
+                  {% for message in messages %}
+                    <div>{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Are the samples valid?</label>
+                <div class="flex space-x-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" class="form-radio" name="samples_valid" value="yes" required>
+                        <span class="ml-2">Yes</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" class="form-radio" name="samples_valid" value="no" required>
+                        <span class="ml-2">No</span>
+                    </label>
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Continue</button>
+        </form>
+    </div>
+</body>
+</html> 

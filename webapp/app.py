@@ -4,8 +4,10 @@ import importlib.util
 from typing import List
 
 from flask import (Flask, request, render_template, redirect, url_for,
-                   flash, send_file)
+                   flash, send_file, session)
 import pandas as pd
+import pickle
+from werkzeug.utils import secure_filename
 
 # Hugging-Face / Torch imports (install once: pip install transformers torch)
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -160,6 +162,215 @@ def download():
 @app.route("/about")
 def about():
     return render_template("about.html")
+
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file part')
+            return render_template('upload.html')
+        file = request.files['file']
+        if file.filename == '':
+            flash('No selected file')
+            return render_template('upload.html')
+        if file:
+            filename = secure_filename(file.filename)
+            try:
+                df = pd.read_csv(file)
+            except Exception as e:
+                flash(f'Error reading CSV: {e}')
+                return render_template('upload.html')
+            if 'text' not in df.columns:
+                flash("CSV must contain a 'text' column.")
+                return render_template('upload.html')
+            # Save DataFrame to a temp file
+            temp = tempfile.NamedTemporaryFile(delete=False, suffix='.pkl')
+            pickle.dump(df, temp)
+            temp.close()
+            session['data_file'] = temp.name
+            return redirect(url_for('llm_audit'))
+    return render_template('upload.html')
+
+
+@app.route('/llm_audit', methods=['GET', 'POST'])
+def llm_audit():
+    if request.method == 'POST':
+        choice = request.form.get('llm_audit')
+        if choice not in ['yes', 'no']:
+            flash('Please select Yes or No.')
+            return render_template('llm_audit.html')
+        session['llm_audit'] = choice
+        if choice == 'no':
+            return redirect(url_for('no_audit'))
+        else:
+            return redirect(url_for('choose_llm'))
+    return render_template('llm_audit.html')
+
+
+# Placeholder for /no_audit route
+@app.route('/no_audit')
+def no_audit():
+    return render_template('no_audit.html')
+
+
+@app.route('/choose_llm', methods=['GET', 'POST'])
+def choose_llm():
+    predefined_llms = ['GPT-3.5', 'GPT-4', 'Llama-2', 'Custom']
+    if request.method == 'POST':
+        llm_choice = request.form.get('llm_choice')
+        custom_llm = request.form.get('custom_llm', '').strip()
+        if llm_choice not in predefined_llms:
+            flash('Please select a valid LLM.')
+            return render_template('choose_llm.html', predefined_llms=predefined_llms)
+        if llm_choice == 'Custom' and not custom_llm:
+            flash('Please specify your custom model.')
+            return render_template('choose_llm.html', predefined_llms=predefined_llms)
+        session['llm_choice'] = llm_choice
+        session['custom_llm'] = custom_llm if llm_choice == 'Custom' else ''
+        return redirect(url_for('choose_metric'))
+    return render_template('choose_llm.html', predefined_llms=predefined_llms)
+
+
+@app.route('/choose_metric', methods=['GET', 'POST'])
+def choose_metric():
+    predefined_metrics = ['Accuracy', 'F1 Score', 'Mean Squared Error', 'AUC']
+    if request.method == 'POST':
+        metric_choice = request.form.get('metric_choice')
+        if metric_choice not in predefined_metrics:
+            flash('Please select a valid performance metric.')
+            return render_template('choose_metric.html', predefined_metrics=predefined_metrics)
+        session['metric_choice'] = metric_choice
+        return redirect(url_for('choose_variable_type'))
+    return render_template('choose_metric.html', predefined_metrics=predefined_metrics)
+
+
+@app.route('/choose_variable_type', methods=['GET', 'POST'])
+def choose_variable_type():
+    variable_types = ['Binary', 'Continuous']
+    if request.method == 'POST':
+        variable_type = request.form.get('variable_type')
+        if variable_type not in variable_types:
+            flash('Please select a valid variable type.')
+            return render_template('choose_variable_type.html', variable_types=variable_types)
+        session['variable_type'] = variable_type
+        return redirect(url_for('batch_score_filter'))
+    return render_template('choose_variable_type.html', variable_types=variable_types)
+
+
+@app.route('/batch_score_filter', methods=['GET', 'POST'])
+def batch_score_filter():
+    if request.method == 'POST':
+        filter_enabled = request.form.get('batch_score_filter') == 'on'
+        threshold = request.form.get('batch_score_threshold')
+        if filter_enabled:
+            try:
+                threshold_val = float(threshold)
+            except (TypeError, ValueError):
+                flash('Please enter a valid batch score threshold.')
+                return render_template('batch_score_filter.html', filter_enabled=filter_enabled, threshold=threshold)
+            session['batch_score_filter'] = True
+            session['batch_score_threshold'] = threshold_val
+        else:
+            session['batch_score_filter'] = False
+            session['batch_score_threshold'] = None
+        return redirect(url_for('choose_variation'))
+    return render_template('batch_score_filter.html', filter_enabled=False, threshold='')
+
+
+@app.route('/choose_variation', methods=['GET', 'POST'])
+def choose_variation():
+    available_variations = ['spelling', 'spanglish', 'noun_transfer', 'cognates']
+    if request.method == 'POST':
+        selected = request.form.getlist('variations')
+        if not selected:
+            flash('Please select at least one variation.')
+            return render_template('choose_variation.html', available_variations=available_variations, selected=selected)
+        session['variations'] = selected
+        return redirect(url_for('preview_variation'))
+    return render_template('choose_variation.html', available_variations=available_variations, selected=[])
+
+
+@app.route('/preview_variation', methods=['GET', 'POST'])
+def preview_variation():
+    from ai_bias_audit.auditor import Auditor
+    import pickle
+    import os
+    if request.method == 'POST':
+        valid = request.form.get('samples_valid')
+        if valid == 'no':
+            return redirect(url_for('choose_variation'))
+        elif valid == 'yes':
+            return redirect(url_for('choose_group'))
+        else:
+            flash('Please confirm if the samples are valid.')
+    # GET: generate previews
+    data_file = session.get('data_file')
+    variations = session.get('variations', [])
+    if not data_file or not os.path.exists(data_file):
+        flash('Data file not found. Please upload your data again.')
+        return redirect(url_for('upload'))
+    if not variations:
+        flash('No variations selected. Please select at least one variation.')
+        return redirect(url_for('choose_variation'))
+    with open(data_file, 'rb') as f:
+        df = pickle.load(f)
+    # Use a dummy model for preview (echoes text length)
+    def dummy_model(text):
+        return len(text)
+    auditor = Auditor(dummy_model, df)
+    previews = []
+    for var in variations:
+        try:
+            preview_df = auditor.preview_variation(var, magnitude=50, n_samples=5, random_state=42)
+            previews.append({
+                'variation': var,
+                'samples': preview_df.to_dict(orient='records')
+            })
+        except Exception as e:
+            previews.append({
+                'variation': var,
+                'samples': [],
+                'error': str(e)
+            })
+    return render_template('preview_variation.html', previews=previews)
+
+
+@app.route('/choose_group', methods=['GET', 'POST'])
+def choose_group():
+    import pickle
+    import os
+    data_file = session.get('data_file')
+    if not data_file or not os.path.exists(data_file):
+        flash('Data file not found. Please upload your data again.')
+        return redirect(url_for('upload'))
+    with open(data_file, 'rb') as f:
+        df = pickle.load(f)
+    exclude_cols = {'text', 'true_grade', 'num_words', 'num_nouns', 'num_cognates'}
+    group_cols = [col for col in df.columns if col not in exclude_cols]
+    if request.method == 'POST':
+        group_col = request.form.get('group_col')
+        if group_col not in group_cols and group_col != '':
+            flash('Please select a valid group column or leave blank.')
+            return render_template('choose_group.html', group_cols=group_cols, selected=group_col)
+        session['group_col'] = group_col
+        return redirect(url_for('choose_measures'))
+    return render_template('choose_group.html', group_cols=group_cols, selected='')
+
+
+@app.route('/choose_measures', methods=['GET', 'POST'])
+def choose_measures():
+    bias_measures = ['bias_0', 'bias_1', 'bias_2', 'bias_3']
+    moments = ['mean', 'variance', 'skewness']
+    available_measures = [f'{b}_{m}' for b in bias_measures for m in moments]
+    if request.method == 'POST':
+        selected = request.form.getlist('measures')
+        if not selected:
+            flash('Please select at least one measure/moment.')
+            return render_template('choose_measures.html', available_measures=available_measures, selected=selected)
+        session['measures'] = selected
+        return redirect(url_for('audit_results'))
+    return render_template('choose_measures.html', available_measures=available_measures, selected=[])
 
 
 # ────────────────────────── shared form-handler ──────────────────────────
