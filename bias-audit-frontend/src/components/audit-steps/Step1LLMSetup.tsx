@@ -113,6 +113,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   const [assessmentMetricValue, setAssessmentMetricValue] = useState<number | null>(null);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const [assessmentSkipped, setAssessmentSkipped] = useState<boolean>(false);
+  const [sessionId, setSessionId] = useState<string | null>(auditState.sessionId || null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -188,6 +189,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
       setAssessmentResults(response.samples);
       setAssessmentMetric(response.metric);
       setAssessmentMetricValue(response.metric_value);
+      setSessionId(response.session_id);  // Store session_id for later use
       // Set initial performance and satisfactory if metric is available
       if (typeof response.metric_value === 'number') {
         setInitialPerformance(response.metric_value);
@@ -233,6 +235,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         customModelFile: selectedLLM.id === 'custom' ? customModelFile : undefined,
         aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
         rubric: selectedLLM.id !== 'custom' && rubric ? rubric : undefined,
+        sessionId: sessionId || undefined,
       });
       onNext();
     }

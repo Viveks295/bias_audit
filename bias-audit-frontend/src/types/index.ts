@@ -40,6 +40,7 @@ export interface AuditState {
   customModelFile?: File | null;
   aiPrompt?: string;
   rubric?: string;
+  sessionId?: string;  // Backend session ID for CSV access
   
   // Step 2: Data Filtering
   useScoreCutoff: boolean | null;
@@ -48,6 +49,7 @@ export interface AuditState {
   
   // Step 3: Validation
   variationsValid: boolean | null;
+  sampledVariations?: any[];  // Store sampled variations for display
   
   // Step 4: Additional Measures
   useAdditionalMeasures: boolean | null;

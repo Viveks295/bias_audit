@@ -11,8 +11,20 @@ import {
   RadioGroup,
   Alert,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
+import { ExpandMore } from '@mui/icons-material';
 import { AuditState } from '../../types';
+import { auditAPI } from '../../services/api';
 
 interface Step3ValidationProps {
   auditState: AuditState;
@@ -29,21 +41,43 @@ const Step3Validation: React.FC<Step3ValidationProps> = ({
 }) => {
   const [variationsValid, setVariationsValid] = useState<boolean | null>(auditState.variationsValid);
   const [isSampling, setIsSampling] = useState(false);
+  const [sampledVariations, setSampledVariations] = useState<any[] | null>(auditState.sampledVariations || null);
+  const [samplingError, setSamplingError] = useState<string | null>(null);
 
   const handleValidationChange = (value: string) => {
     setVariationsValid(value === 'true');
   };
 
   const handleSampleVariations = async () => {
+    if (!auditState.sessionId || !auditState.selectedVariations.length) {
+      setSamplingError('Missing session ID or no variations selected');
+      return;
+    }
+
     setIsSampling(true);
-    // Simulate sampling process
-    setTimeout(() => {
+    setSamplingError(null);
+    
+    try {
+      const response = await auditAPI.sampleVariations({
+        sessionId: auditState.sessionId,
+        variationTypes: auditState.selectedVariations.map(v => v.id),
+        sampleSize: 5,
+        magnitude: 50,
+      });
+      
+      setSampledVariations(response.samples);
+    } catch (err: any) {
+      setSamplingError(err?.response?.data?.error || err.message || 'Error sampling variations');
+    } finally {
       setIsSampling(false);
-    }, 2000);
+    }
   };
 
   const handleNext = () => {
-    onComplete({ variationsValid });
+    onComplete({ 
+      variationsValid,
+      sampledVariations: sampledVariations || undefined,
+    });
     onNext();
   };
 
@@ -71,12 +105,60 @@ const Step3Validation: React.FC<Step3ValidationProps> = ({
             <Button
               variant="outlined"
               onClick={handleSampleVariations}
-              disabled={isSampling}
+              disabled={isSampling || !auditState.sessionId || !auditState.selectedVariations.length}
               startIcon={isSampling ? <CircularProgress size={20} /> : null}
             >
               {isSampling ? 'Sampling...' : 'Sample Variations'}
             </Button>
           </Box>
+
+          {samplingError && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {samplingError}
+            </Alert>
+          )}
+
+          {sampledVariations && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Sampled Variations (5 rows from your CSV):
+              </Typography>
+              
+              {sampledVariations.map((sample, index) => (
+                <Accordion key={index} sx={{ mb: 1 }}>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Typography>
+                      Row {sample.row_index}: "{sample.original.substring(0, 50)}..."
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Original Text:
+                      </Typography>
+                      <Paper sx={{ p: 2, mb: 2, backgroundColor: 'grey.50' }}>
+                        {sample.original}
+                      </Paper>
+                      
+                      <Typography variant="subtitle2" gutterBottom>
+                        Variations:
+                      </Typography>
+                      {Object.entries(sample.variations).map(([variationType, variedText]) => (
+                        <Box key={variationType} sx={{ mb: 2 }}>
+                          <Typography variant="body2" fontWeight="bold" color="primary">
+                            {variationType.charAt(0).toUpperCase() + variationType.slice(1)}:
+                          </Typography>
+                          <Paper sx={{ p: 2, backgroundColor: 'grey.50' }}>
+                            {variedText as string}
+                          </Paper>
+                        </Box>
+                      ))}
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              ))}
+            </Box>
+          )}
 
           <FormControl component="fieldset">
             <RadioGroup

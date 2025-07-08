@@ -17,6 +17,9 @@ CORS(app)  # Enable CORS for React frontend
 # Global storage for audit sessions
 audit_sessions = {}
 
+# Global storage for uploaded CSV files (session_id -> DataFrame)
+csv_storage = {}
+
 api = Blueprint('api', __name__)
 
 @api.route('/api/variations', methods=['GET'])
@@ -243,6 +246,11 @@ def assess_performance():
     df = pd.read_csv(csv_file)
     if 'text' not in df.columns:
         return jsonify({'error': 'CSV must contain a "text" column'}), 400
+    
+    # Store the full CSV for later use
+    session_id = f"csv_{len(csv_storage) + 1}"
+    csv_storage[session_id] = df
+    
     sample_df = df.sample(n=min(10, len(df)), random_state=42)
 
     # Prepare results
@@ -315,9 +323,64 @@ def assess_performance():
             metric_value = None
 
     return jsonify({
+        'session_id': session_id,  # Return session_id for later use
         'samples': results,
         'metric': metric,
         'metric_value': metric_value
+    })
+
+@api.route('/api/sample-variations', methods=['POST'])
+def sample_variations():
+    """Sample rows from uploaded CSV and generate variations for each selected variation type."""
+    data = request.json
+    session_id = data.get('session_id')
+    variation_types = data.get('variation_types', [])
+    sample_size = data.get('sample_size', 5)
+    magnitude = data.get('magnitude', 50)
+
+    if not session_id or session_id not in csv_storage:
+        return jsonify({'error': 'Invalid session_id or CSV not found'}), 400
+
+    if not variation_types:
+        return jsonify({'error': 'No variation types specified'}), 400
+
+    # Get the stored CSV
+    df = csv_storage[session_id]
+    
+    # Sample rows from the CSV
+    if len(df) < sample_size:
+        sample_size = len(df)
+    
+    sampled_rows = df.sample(n=sample_size, random_state=42)
+    
+    # Generate variations for each sampled row
+    samples = []
+    
+    for idx, row in sampled_rows.iterrows():
+        original_text = row['text']
+        row_data = {
+            'row_index': int(idx),
+            'original': original_text,
+            'variations': {}
+        }
+        
+        # Apply each variation type to this text
+        for variation_type in variation_types:
+            try:
+                variation = get_variation(variation_type)
+                # Set a fixed seed for consistency across variations for this sample
+                random.seed(idx)
+                varied_text = variation.apply(original_text, magnitude)
+                row_data['variations'][variation_type] = varied_text
+            except Exception as e:
+                row_data['variations'][variation_type] = f"Error: {str(e)}"
+        
+        samples.append(row_data)
+    
+    return jsonify({
+        'samples': samples,
+        'total_rows': len(df),
+        'sampled_rows': sample_size
     })
 
 if __name__ == '__main__':

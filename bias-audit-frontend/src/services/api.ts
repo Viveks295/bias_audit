@@ -102,6 +102,22 @@ export const auditAPI = {
     });
     return response.data;
   },
+
+  // Sample variations from uploaded CSV
+  sampleVariations: async (params: {
+    sessionId: string;
+    variationTypes: string[];
+    sampleSize?: number;
+    magnitude?: number;
+  }) => {
+    const response = await api.post('/api/sample-variations', {
+      session_id: params.sessionId,
+      variation_types: params.variationTypes,
+      sample_size: params.sampleSize || 5,
+      magnitude: params.magnitude || 50,
+    });
+    return response.data;
+  },
 };
 
 export default api; 
