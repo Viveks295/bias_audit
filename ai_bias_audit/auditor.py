@@ -161,6 +161,12 @@ class Auditor:
             self.results['bias_3'] = err / (1 - orig.replace(1, 1-1e-8))
             # Drop helper columns
             self.results.drop(columns=['feature_col', 'feature_val', 'num_words_val', 'pert'], inplace=True)
+            
+            # Round numeric columns to 3 decimal places
+            numeric_columns = ['original_grade', 'perturbed_grade', 'difference', 'bias_0', 'bias_1', 'bias_2', 'bias_3']
+            for col in numeric_columns:
+                if col in self.results.columns:
+                    self.results[col] = self.results[col].round(3)
         return self.results
     
     def preview_variation(
@@ -224,4 +230,11 @@ class Auditor:
                 row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
                 row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
             moments.append(row)
-        return pd.DataFrame(moments)
+        moments_df = pd.DataFrame(moments)
+        
+        # Round numeric columns to 3 decimal places
+        numeric_columns = [col for col in moments_df.columns if any(bias_measure in col for bias_measure in ['bias_0', 'bias_1', 'bias_2', 'bias_3'])]
+        for col in numeric_columns:
+            moments_df[col] = moments_df[col].round(3)
+            
+        return moments_df

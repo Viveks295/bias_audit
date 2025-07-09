@@ -21,6 +21,7 @@ audit_sessions = {}
 csv_storage = {}
 
 api = Blueprint('api', __name__)
+CORS(api)  # Enable CORS specifically for the API Blueprint
 
 @api.route('/api/variations', methods=['GET'])
 def get_variations():
@@ -247,9 +248,29 @@ def assess_performance():
     if 'text' not in df.columns:
         return jsonify({'error': 'CSV must contain a "text" column'}), 400
     
-    # Store the full CSV for later use
+    # Store the full CSV and model info for later use
     session_id = f"csv_{len(csv_storage) + 1}"
-    csv_storage[session_id] = df
+    
+    # Store model info and data
+    session_data = {
+        'data': df,
+        'model_type': model_type,
+        'ai_prompt': ai_prompt or '',
+        'rubric': rubric or '',
+        'custom_model_path': None
+    }
+    
+    # Handle custom model file storage
+    if model_type == 'custom' and custom_model_file:
+        # Save custom model file to persistent location
+        import tempfile
+        import os
+        temp_dir = tempfile.mkdtemp(prefix="custom_model_")
+        model_path = os.path.join(temp_dir, custom_model_file.filename)
+        custom_model_file.save(model_path)
+        session_data['custom_model_path'] = model_path
+    
+    csv_storage[session_id] = session_data
     
     sample_df = df.sample(n=min(10, len(df)), random_state=42)
 
@@ -262,13 +283,21 @@ def assess_performance():
     if model_type == 'custom':
         if not custom_model_file:
             return jsonify({'error': 'Custom model file required'}), 400
-        # Save and import the custom model file
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = os.path.join(tmpdir, custom_model_file.filename)
-            custom_model_file.save(model_path)
+        
+        # Use the stored model path from session_data
+        model_path = session_data['custom_model_path']
+        if not model_path or not os.path.exists(model_path):
+            return jsonify({'error': 'Custom model file not found'}), 500
+            
+        try:
             spec = importlib.util.spec_from_file_location('custom_model', model_path)
             custom_model = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(custom_model)
+            
+            # Check if grade function exists
+            if not hasattr(custom_model, 'grade'):
+                return jsonify({'error': 'Custom model must define a grade(text) function'}), 500
+                
             # Assume the custom model has a function grade(text: str) -> float/int
             for _, row in sample_df.iterrows():
                 text = row['text']
@@ -278,6 +307,8 @@ def assess_performance():
                 if true is not None:
                     true_grades.append(true)
                 results.append({'text': text, 'predicted_grade': pred, 'true_grade': true})
+        except Exception as e:
+            return jsonify({'error': f'Error loading custom model: {str(e)}'}), 500
     else:
         # Use OpenAI API for grading
         openai.api_key = os.environ.get('OPENAI_API_KEY')
@@ -285,10 +316,10 @@ def assess_performance():
             return jsonify({'error': 'OpenAI API key not set'}), 500
         for _, row in sample_df.iterrows():
             text = row['text']
-            prompt = f"{ai_prompt}\nRubric: {rubric}\nText: {text}\nGrade:"
+            prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
             try:
                 response = openai.ChatCompletion.create(
-                    model='gpt-4o' if model_type == 'gpt-4o' else 'gpt-4-1106-preview',
+                    model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=10,
                     temperature=0
@@ -345,7 +376,7 @@ def sample_variations():
         return jsonify({'error': 'No variation types specified'}), 400
 
     # Get the stored CSV
-    df = csv_storage[session_id]
+    df = csv_storage[session_id]['data']
     
     # Sample rows from the CSV
     if len(df) < sample_size:
@@ -381,6 +412,90 @@ def sample_variations():
         'samples': samples,
         'total_rows': len(df),
         'sampled_rows': sample_size
+    })
+
+@api.route('/api/preview_audit', methods=['POST'])
+def preview_audit():
+    """
+    Preview audit results for 5 sample texts with the user's model and selected variation/magnitude.
+    Expects JSON: {
+        "session_id": str,
+        "sample_texts": [str, ...],
+        "variation": str,
+        "magnitude": int
+    }
+    Returns: {
+        "bias_table": [...],
+        "moments_table": [...]
+    }
+    """
+    data = request.get_json()
+    session_id = data.get("session_id")
+    sample_texts = data.get("sample_texts", [])
+    variation = data.get("variation")
+    magnitude = data.get("magnitude", 50)
+
+    print(f"[DEBUG] /api/preview_audit called with session_id: {session_id}")
+    print(f"[DEBUG] Current csv_storage keys: {list(csv_storage.keys())}")
+
+    if not session_id or not sample_texts or not variation:
+        return jsonify({"error": "Missing required fields."}), 400
+    if len(sample_texts) != 5:
+        return jsonify({"error": "Must provide 5 sample texts."}), 400
+
+    # Use csv_storage for preview steps
+    session_data = csv_storage.get(session_id)
+    if session_data is None:
+        print(f"[DEBUG] Session {session_id} not found in csv_storage.")
+        return jsonify({"error": "Session not found."}), 404
+    print(f"[DEBUG] Using csv_storage for preview.")
+
+    # Reconstruct the real model using stored model info
+    model_type = session_data['model_type']
+    ai_prompt = session_data['ai_prompt']
+    rubric = session_data['rubric']
+    custom_model_path = session_data['custom_model_path']
+
+    if model_type == 'custom':
+        # Load custom model from stored file
+        if not custom_model_path or not os.path.exists(custom_model_path):
+            return jsonify({"error": "Custom model file not found."}), 500
+        spec = importlib.util.spec_from_file_location("model_module", custom_model_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        if not hasattr(mod, "grade"):
+            return jsonify({"error": "Custom script must define grade(text)"}), 500
+        grade_fn = mod.grade
+    else:
+        # Use OpenAI API for grading
+        import openai
+        openai.api_key = os.environ.get('OPENAI_API_KEY')
+        if not openai.api_key:
+            return jsonify({'error': 'OpenAI API key not set'}), 500
+        def grade_fn(text: str) -> float:
+            prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
+            try:
+                response = openai.ChatCompletion.create(
+                    model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=10,
+                    temperature=0
+                )
+                pred = response['choices'][0]['message']['content'].strip()
+                return float(pred)
+            except Exception:
+                return float('nan')
+
+    import pandas as pd
+    from ai_bias_audit.auditor import Auditor
+    df_preview = pd.DataFrame({"text": sample_texts})
+    auditor = Auditor(model=grade_fn, data=df_preview)
+    bias_df = auditor.audit([variation], [magnitude])
+    moments_df = auditor.audit_moments()
+
+    return jsonify({
+        "bias_table": bias_df.to_dict(orient="records"),
+        "moments_table": moments_df.to_dict(orient="records")
     })
 
 if __name__ == '__main__':

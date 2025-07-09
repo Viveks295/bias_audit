@@ -118,6 +118,22 @@ export const auditAPI = {
     });
     return response.data;
   },
+
+  // Preview audit results for 5 sample texts
+  previewAudit: async (params: {
+    sessionId: string;
+    sampleTexts: string[];
+    variation: string;
+    magnitude: number;
+  }) => {
+    const response = await api.post('/api/preview_audit', {
+      session_id: params.sessionId,
+      sample_texts: params.sampleTexts,
+      variation: params.variation,
+      magnitude: params.magnitude,
+    });
+    return response.data;
+  },
 };
 
 export default api; 
