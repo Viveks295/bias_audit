@@ -12,6 +12,7 @@ import {
   Alert,
   CircularProgress,
   Paper,
+  TextField,
 } from '@mui/material';
 import { CloudUpload } from '@mui/icons-material';
 import { AuditState, LLMModel, PerformanceMetric } from '../../types';
@@ -447,24 +448,26 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
             )}
             {(selectedLLM?.id === 'gpt-4.1' || selectedLLM?.id === 'gpt-4o') && (
               <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <FormControl fullWidth>
-                  <InputLabel shrink>Model AI Prompt</InputLabel>
-                  <textarea
-                    style={{ width: '100%', minHeight: 60, fontFamily: 'inherit', fontSize: '1rem', padding: 8 }}
-                    value={aiPrompt}
-                    onChange={e => setAiPrompt(e.target.value)}
-                    placeholder="Enter the prompt you will use for the AI model"
-                  />
-                </FormControl>
-                <FormControl fullWidth>
-                  <InputLabel shrink>Rubric (Optional)</InputLabel>
-                  <textarea
-                    style={{ width: '100%', minHeight: 60, fontFamily: 'inherit', fontSize: '1rem', padding: 8 }}
-                    value={rubric}
-                    onChange={e => setRubric(e.target.value)}
-                    placeholder="Enter the grading rubric for the model"
-                  />
-                </FormControl>
+                <TextField
+                  label="Model AI Prompt"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  placeholder="Enter the prompt you will use for the AI model"
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  variant="outlined"
+                />
+                <TextField
+                  label="Rubric (Optional)"
+                  value={rubric}
+                  onChange={e => setRubric(e.target.value)}
+                  placeholder="Enter the grading rubric for the model"
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  variant="outlined"
+                />
               </Box>
             )}
           </CardContent>

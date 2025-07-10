@@ -71,7 +71,7 @@ const AboutPage: React.FC = () => {
             </ListItemIcon>
             <ListItemText
               primary="Statistical Analysis"
-              secondary="Generate statistical moments (mean, variance, skewness, kurtosis) for comprehensive bias analysis"
+              secondary="Generate statistical moments (mean, variance, skewness) for comprehensive bias analysis"
             />
           </ListItem>
           <ListItem>
@@ -164,7 +164,7 @@ const AboutPage: React.FC = () => {
                 Spelling Errors
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Introduce controlled spelling mistakes to test model robustness to common writing errors.
+                Introduce controlled spelling mistakes to test model robustness to writing errors.
               </Typography>
             </CardContent>
           </Card>
@@ -174,7 +174,7 @@ const AboutPage: React.FC = () => {
                 Spanglish
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Mix Spanish and English words to test bias against bilingual writing styles.
+                Mix Spanish and English phrases to test bias against bilingual writing styles.
               </Typography>
             </CardContent>
           </Card>
@@ -184,7 +184,7 @@ const AboutPage: React.FC = () => {
                 Noun Transfer
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Replace nouns with semantically similar alternatives to test vocabulary bias.
+                Replace nouns with their Spanish equivalents to test language bias.
               </Typography>
             </CardContent>
           </Card>
@@ -194,7 +194,17 @@ const AboutPage: React.FC = () => {
                 Cognates
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Use cognate words from other languages to test cross-linguistic bias.
+                Use cognate words from Spanish to test cross-linguistic bias.
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                PIO (Phonetically Influenced Orthography)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Test for the influence of phonetic features on spelling.
               </Typography>
             </CardContent>
           </Card>
