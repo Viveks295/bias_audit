@@ -16,6 +16,7 @@ import {
 import { CloudUpload } from '@mui/icons-material';
 import { AuditState, LLMModel, PerformanceMetric } from '../../types';
 import { auditAPI } from '../../services/api';
+import Papa from 'papaparse';
 
 interface Step1LLMSetupProps {
   auditState: AuditState;
@@ -96,6 +97,8 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
 }) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(auditState.uploadedFile);
   const [filePreview, setFilePreview] = useState<string | null>(auditState.filePreview);
+  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedLLM, setSelectedLLM] = useState<LLMModel | null>(auditState.selectedLLM);
@@ -131,6 +134,12 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     reader.onload = (e) => {
       const content = e.target?.result as string;
       setFilePreview(content.substring(0, 500) + (content.length > 500 ? '...' : ''));
+      // Use PapaParse to parse CSV robustly
+      const parsed = Papa.parse(content, { header: false });
+      if (parsed.data && parsed.data.length > 0) {
+        setCsvHeaders(parsed.data[0] as string[]);
+        setCsvData((parsed.data as string[][]).slice(1, 6)); // first 5 rows
+      }
       setUploadedFile(file);
       setIsUploading(false);
     };
@@ -325,23 +334,58 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
               </Alert>
             )}
 
-            {filePreview && (
+            {csvHeaders.length > 0 && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  File Preview:
+                  File Preview (First 5 rows):
                 </Typography>
                 <Paper
                   variant="outlined"
                   sx={{
                     p: 2,
                     backgroundColor: 'grey.50',
-                    fontFamily: 'monospace',
-                    fontSize: '0.875rem',
-                    maxHeight: 200,
+                    maxHeight: 300,
                     overflow: 'auto',
                   }}
                 >
-                  {filePreview}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f5f5f5' }}>
+                        {csvHeaders.map((header, index) => (
+                          <th
+                            key={index}
+                            style={{
+                              textAlign: 'left',
+                              padding: '8px',
+                              borderBottom: '2px solid #ddd',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvData.map((row, rowIndex) => (
+                        <tr key={rowIndex} style={{ borderBottom: '1px solid #eee' }}>
+                          {row.map((cell, cellIndex) => (
+                            <td
+                              key={cellIndex}
+                              style={{
+                                padding: '8px',
+                                verticalAlign: 'top',
+                                maxWidth: 200,
+                                wordBreak: 'break-word',
+                              }}
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </Paper>
               </Box>
             )}
