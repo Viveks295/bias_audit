@@ -198,6 +198,22 @@ def start_audit():
         auditor = Auditor(model=grade_fn, data=df)
         bias_df = auditor.audit(variations, magnitudes, score_cutoff=score_cutoff, group_col=group_col)
         
+        # Calculate moments during the initial audit
+        moments = []
+        if model_type != 'custom':  # Moments not supported for custom models
+            try:
+                print(f"Calculating moments for session {session_id} with group_col: {group_col}")
+                moments_df = auditor.audit_moments(group_col=group_col)
+                moments = moments_df.to_dict(orient="records")
+                print(f"Successfully calculated {len(moments)} moments")
+            except Exception as e:
+                print(f"Moments calculation error during audit: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                moments = []
+        else:
+            print(f"Skipping moments calculation for custom model in session {session_id}")
+        
         # Convert results to the expected format
         results = []
         for _, row in bias_df.iterrows():
@@ -225,6 +241,7 @@ def start_audit():
         groups_analyzed = len(set(r.get('group', 'default') for r in results))
         
         audit_sessions[session_id]['results'] = results
+        audit_sessions[session_id]['moments'] = moments  # Store moments from initial audit
         audit_sessions[session_id]['status'] = 'completed'
         
         return jsonify({
@@ -246,38 +263,57 @@ def start_audit():
 @api.route('/api/results/<session_id>', methods=['GET'])
 def get_results(session_id):
     """Get audit results for a session."""
-    # Check both audit_sessions and csv_storage
-    session_data = None
-    
-    if session_id in audit_sessions:
-        session_data = audit_sessions[session_id]
-    elif session_id in csv_storage:
-        # If it's a csv session, we need to check if there are any audit results
-        # For now, return an error indicating this session doesn't have audit results
-        return jsonify({'error': 'This session does not contain audit results. Please run an audit first.'}), 404
-    else:
-        return jsonify({'error': 'Session not found'}), 404
-    
-    if session_data['status'] != 'completed':
-        return jsonify({'error': 'Audit not completed'}), 400
-    
-    results = session_data['results']
-    
-    # Calculate summary statistics
-    total_variations = len(results)
-    average_grade_change = sum(r['difference'] for r in results) / total_variations
-    max_bias_measure = max(abs(r['biasMeasures']['bias_1']) for r in results)
-    groups_analyzed = len(set(r.get('group', 'default') for r in results))
-    
-    return jsonify({
-        'results': results,
-        'summary': {
-            'totalVariations': total_variations,
-            'averageGradeChange': average_grade_change,
-            'maxBiasMeasure': max_bias_measure,
-            'groupsAnalyzed': groups_analyzed,
-        }
-    })
+    try:
+        # Check both audit_sessions and csv_storage
+        session_data = None
+        
+        if session_id in audit_sessions:
+            session_data = audit_sessions[session_id]
+        elif session_id in csv_storage:
+            # If it's a csv session, we need to check if there are any audit results
+            # For now, return an error indicating this session doesn't have audit results
+            return jsonify({'error': 'This session does not contain audit results. Please run an audit first.'}), 404
+        else:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        if session_data['status'] != 'completed':
+            return jsonify({'error': 'Audit not completed'}), 400
+        
+        results = session_data['results']
+        
+        # Calculate summary statistics
+        total_variations = len(results)
+        average_grade_change = sum(r['difference'] for r in results) / total_variations
+        max_bias_measure = max(abs(r['biasMeasures']['bias_1']) for r in results)
+        groups_analyzed = len(set(r.get('group', 'default') for r in results))
+
+        # Get stored moments from the initial audit
+        moments = session_data.get('moments', [])
+        
+        # Debug logging
+        print(f"Session {session_id} - Results count: {len(results)}, Moments count: {len(moments)}")
+        print(f"Session data keys: {list(session_data.keys())}")
+        
+        # If moments don't exist (older sessions), return empty array
+        if 'moments' not in session_data:
+            print(f"Warning: No moments found in session {session_id}, returning empty array")
+            moments = []
+
+        return jsonify({
+            'results': results,
+            'summary': {
+                'totalVariations': total_variations,
+                'averageGradeChange': average_grade_change,
+                'maxBiasMeasure': max_bias_measure,
+                'groupsAnalyzed': groups_analyzed,
+            },
+            'moments': moments
+        })
+    except Exception as e:
+        print(f"Error in get_results for session {session_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 @api.route('/api/download/<session_id>', methods=['GET'])
 def download_results(session_id):

@@ -26,6 +26,7 @@ export interface AuditResponse {
     maxBiasMeasure: number;
     groupsAnalyzed: number;
   };
+  moments?: any[];
 }
 
 export const auditAPI = {
