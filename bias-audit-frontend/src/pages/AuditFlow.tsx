@@ -48,6 +48,7 @@ const AuditFlow: React.FC = () => {
     variationMagnitudes: {},
     useGrouping: null,
     groupingVariable: null,
+    notificationEmail: null,
     auditResults: null,
     currentStep: 0,
   });

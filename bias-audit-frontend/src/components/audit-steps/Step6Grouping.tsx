@@ -31,8 +31,10 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
 }) => {
   const [useGrouping, setUseGrouping] = useState<boolean | null>(auditState.useGrouping);
   const [groupingVariable, setGroupingVariable] = useState<string | null>(auditState.groupingVariable);
+  const [notificationEmail, setNotificationEmail] = useState<string | null>(auditState.notificationEmail || null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailRegistered, setEmailRegistered] = useState(false);
 
   const handleGroupingChange = (value: string) => {
     setUseGrouping(value === 'true');
@@ -66,13 +68,23 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
       const updatedAuditState = {
         useGrouping,
         groupingVariable,
+        notificationEmail,
         auditResults: response,
         sessionId: response.sessionId,
       };
       
       onComplete(updatedAuditState);
       setIsGenerating(false);
-      onFinish(updatedAuditState);
+      
+      // Show success message if email was provided
+      if (notificationEmail) {
+        setEmailRegistered(true);
+        setTimeout(() => {
+          onFinish(updatedAuditState);
+        }, 2000); // Show message for 2 seconds
+      } else {
+        onFinish(updatedAuditState);
+      }
     } catch (err) {
       console.error('Audit failed:', err);
       setError(err instanceof Error ? err.message : 'Audit failed. Please try again.');
@@ -126,6 +138,27 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
+            Email Notification (Optional)
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Get notified when your audit is complete. We'll send you a link to view your results.
+          </Typography>
+          
+          <TextField
+            label="Email Address"
+            type="email"
+            value={notificationEmail || ''}
+            onChange={(e) => setNotificationEmail(e.target.value)}
+            helperText="Enter your email to receive a notification when the audit is ready"
+            fullWidth
+            placeholder="your.email@example.com"
+          />
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
             Audit Summary
           </Typography>
           <Box sx={{ mb: 2 }}>
@@ -135,11 +168,12 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
             <Typography variant="body2">
               <strong>Outcome Type:</strong> {auditState.outcomeType}
             </Typography>
+
             <Typography variant="body2">
-              <strong>Performance Metric:</strong> {auditState.selectedMetric?.name}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Variations:</strong> {auditState.selectedVariations.map(v => v.name).join(', ')}
+              <strong>Variations:</strong> {auditState.selectedVariations.map(v => {
+                const magnitude = auditState.variationMagnitudes[v.id] || v.defaultMagnitude;
+                return `${v.name} (${magnitude})`;
+              }).join(', ')}
             </Typography>
             <Typography variant="body2">
               <strong>Score Cutoff:</strong> {auditState.useScoreCutoff ? `Yes (${auditState.cutoffScore})` : 'No'}
@@ -167,6 +201,13 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+
+      {/* Success Message */}
+      {emailRegistered && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Email notification registered! You'll receive a link to your results when the audit is complete.
         </Alert>
       )}
 

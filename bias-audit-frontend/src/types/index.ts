@@ -63,6 +63,7 @@ export interface AuditState {
   // Step 6: Grouping
   useGrouping: boolean | null;
   groupingVariable: string | null;
+  notificationEmail?: string | null;
   
   // Results
   auditResults: any | null;

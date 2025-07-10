@@ -466,29 +466,45 @@ const ResultsPage: React.FC = () => {
                     <TableCell>Magnitude</TableCell>
                     {auditState?.useGrouping && <TableCell>Group</TableCell>}
                     <TableCell>Bias 0 Mean</TableCell>
-                    <TableCell>Bias 0 Variance</TableCell>
-                    <TableCell>Bias 0 Skewness</TableCell>
-                    {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_1') && (
-                      <>
-                        <TableCell>Bias 1 Mean</TableCell>
-                        <TableCell>Bias 1 Variance</TableCell>
-                        <TableCell>Bias 1 Skewness</TableCell>
-                      </>
+                    {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                      <TableCell>Bias 0 Variance</TableCell>
                     )}
-                    {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_2') && (
-                      <>
-                        <TableCell>Bias 2 Mean</TableCell>
-                        <TableCell>Bias 2 Variance</TableCell>
-                        <TableCell>Bias 2 Skewness</TableCell>
-                      </>
+                    {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                      <TableCell>Bias 0 Skewness</TableCell>
                     )}
-                    {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_3') && (
-                      <>
-                        <TableCell>Bias 3 Mean</TableCell>
-                        <TableCell>Bias 3 Variance</TableCell>
-                        <TableCell>Bias 3 Skewness</TableCell>
-                      </>
-                    )}
+                                          {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_1') && (
+                        <>
+                          <TableCell>Bias 1 Mean</TableCell>
+                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                            <TableCell>Bias 1 Variance</TableCell>
+                          )}
+                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                            <TableCell>Bias 1 Skewness</TableCell>
+                          )}
+                        </>
+                      )}
+                                          {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_2') && (
+                        <>
+                          <TableCell>Bias 2 Mean</TableCell>
+                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                            <TableCell>Bias 2 Variance</TableCell>
+                          )}
+                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                            <TableCell>Bias 2 Skewness</TableCell>
+                          )}
+                        </>
+                      )}
+                                          {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_3') && (
+                        <>
+                          <TableCell>Bias 3 Mean</TableCell>
+                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                            <TableCell>Bias 3 Variance</TableCell>
+                          )}
+                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                            <TableCell>Bias 3 Skewness</TableCell>
+                          )}
+                        </>
+                      )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -500,29 +516,45 @@ const ResultsPage: React.FC = () => {
                       <TableCell>{moment.magnitude}</TableCell>
                       {auditState?.useGrouping && <TableCell>{moment.group || '-'}</TableCell>}
                       <TableCell>{moment.bias_0_mean?.toFixed(3) || 'N/A'}</TableCell>
-                      <TableCell>{moment.bias_0_var?.toFixed(3) || 'N/A'}</TableCell>
-                      <TableCell>{moment.bias_0_skew?.toFixed(3) || 'N/A'}</TableCell>
-                      {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_1') && (
-                        <>
-                          <TableCell>{moment.bias_1_mean?.toFixed(3) || 'N/A'}</TableCell>
-                          <TableCell>{moment.bias_1_var?.toFixed(3) || 'N/A'}</TableCell>
-                          <TableCell>{moment.bias_1_skew?.toFixed(3) || 'N/A'}</TableCell>
-                        </>
+                      {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                        <TableCell>{moment.bias_0_var?.toFixed(3) || 'N/A'}</TableCell>
                       )}
-                      {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_2') && (
-                        <>
-                          <TableCell>{moment.bias_2_mean?.toFixed(3) || 'N/A'}</TableCell>
-                          <TableCell>{moment.bias_2_var?.toFixed(3) || 'N/A'}</TableCell>
-                          <TableCell>{moment.bias_2_skew?.toFixed(3) || 'N/A'}</TableCell>
-                        </>
+                      {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                        <TableCell>{moment.bias_0_skew?.toFixed(3) || 'N/A'}</TableCell>
                       )}
-                      {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_3') && (
-                        <>
-                          <TableCell>{moment.bias_3_mean?.toFixed(3) || 'N/A'}</TableCell>
-                          <TableCell>{moment.bias_3_var?.toFixed(3) || 'N/A'}</TableCell>
-                          <TableCell>{moment.bias_3_skew?.toFixed(3) || 'N/A'}</TableCell>
-                        </>
-                      )}
+                                              {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_1') && (
+                          <>
+                            <TableCell>{moment.bias_1_mean?.toFixed(3) || 'N/A'}</TableCell>
+                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                              <TableCell>{moment.bias_1_var?.toFixed(3) || 'N/A'}</TableCell>
+                            )}
+                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                              <TableCell>{moment.bias_1_skew?.toFixed(3) || 'N/A'}</TableCell>
+                            )}
+                          </>
+                        )}
+                                              {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_2') && (
+                          <>
+                            <TableCell>{moment.bias_2_mean?.toFixed(3) || 'N/A'}</TableCell>
+                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                              <TableCell>{moment.bias_2_var?.toFixed(3) || 'N/A'}</TableCell>
+                            )}
+                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                              <TableCell>{moment.bias_2_skew?.toFixed(3) || 'N/A'}</TableCell>
+                            )}
+                          </>
+                        )}
+                                              {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_3') && (
+                          <>
+                            <TableCell>{moment.bias_3_mean?.toFixed(3) || 'N/A'}</TableCell>
+                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
+                              <TableCell>{moment.bias_3_var?.toFixed(3) || 'N/A'}</TableCell>
+                            )}
+                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
+                              <TableCell>{moment.bias_3_skew?.toFixed(3) || 'N/A'}</TableCell>
+                            )}
+                          </>
+                        )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -531,7 +563,13 @@ const ResultsPage: React.FC = () => {
           ) : (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <Typography variant="body1" color="text.secondary">
-                No moments data available. This may be because the audit was run without additional measures or moments.
+                No moments data available. This may be because:
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                • The audit was run with a custom model (moments not supported)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                • No audit results are available
               </Typography>
             </Box>
           )}

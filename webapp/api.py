@@ -10,6 +10,9 @@ from ai_bias_audit.auditor import Auditor
 from ai_bias_audit.variations import get_variation
 from openai import OpenAI
 import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
@@ -19,6 +22,44 @@ audit_sessions = {}
 
 # Global storage for uploaded CSV files (session_id -> DataFrame)
 csv_storage = {}
+
+def send_email_notification(email: str, session_id: str, base_url: str = "http://localhost:3000"):
+    """Send email notification when audit is complete."""
+    try:
+        # For now, we'll use a simple print statement
+        # In production, you would configure SMTP settings
+        print(f"EMAIL NOTIFICATION: Audit {session_id} is complete!")
+        print(f"Sending email to: {email}")
+        print(f"Results URL: {base_url}/results?sessionId={session_id}")
+        
+        # TODO: Implement actual email sending
+        # This would require SMTP configuration
+        # Example implementation:
+        # msg = MIMEMultipart()
+        # msg['From'] = 'noreply@biasaudit.com'
+        # msg['To'] = email
+        # msg['Subject'] = 'Your Bias Audit is Ready!'
+        # body = f"Your bias audit is complete. View results at: {base_url}/results?sessionId={session_id}"
+        # msg.attach(MIMEText(body, 'plain'))
+        # 
+        # server = smtplib.SMTP('smtp.gmail.com', 587)
+        # server.starttls()
+        # server.login('your-email@gmail.com', 'your-password')
+        # server.send_message(msg)
+        # server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send email notification: {str(e)}")
+        return False
+
+# Email configuration (set these environment variables in production)
+EMAIL_ENABLED = os.environ.get('EMAIL_ENABLED', 'false').lower() == 'true'
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@biasaudit.com')
 
 api = Blueprint('api', __name__)
 CORS(api)  # Enable CORS specifically for the API Blueprint
@@ -244,6 +285,11 @@ def start_audit():
         audit_sessions[session_id]['moments'] = moments  # Store moments from initial audit
         audit_sessions[session_id]['status'] = 'completed'
         
+        # Send email notification if email is provided
+        notification_email = audit_state.get('notificationEmail')
+        if notification_email:
+            send_email_notification(notification_email, session_id)
+        
         return jsonify({
             'sessionId': session_id,
             'status': 'completed',
@@ -253,7 +299,8 @@ def start_audit():
                 'averageGradeChange': average_grade_change,
                 'maxBiasMeasure': max_bias_measure,
                 'groupsAnalyzed': groups_analyzed,
-            }
+            },
+            'moments': moments
         })
         
     except Exception as e:
