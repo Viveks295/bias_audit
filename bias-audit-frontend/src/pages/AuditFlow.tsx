@@ -66,9 +66,10 @@ const AuditFlow: React.FC = () => {
     setAuditState(prev => ({ ...prev, ...stepData }));
   };
 
-  const handleFinish = () => {
+  const handleFinish = (updatedAuditState?: Partial<AuditState>) => {
     // Navigate to results page with audit state
-    navigate('/results', { state: { auditState } });
+    const finalAuditState = updatedAuditState ? { ...auditState, ...updatedAuditState } : auditState;
+    navigate('/results', { state: { auditState: finalAuditState } });
   };
 
   const getStepContent = (step: number) => {

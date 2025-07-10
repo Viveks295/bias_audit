@@ -11,13 +11,15 @@ import {
   RadioGroup,
   TextField,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import { AuditState } from '../../types';
+import { auditAPI } from '../../services/api';
 
 interface Step6GroupingProps {
   auditState: AuditState;
   onComplete: (data: Partial<AuditState>) => void;
-  onFinish: () => void;
+  onFinish: (updatedAuditState?: Partial<AuditState>) => void;
   onBack: () => void;
 }
 
@@ -30,6 +32,7 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
   const [useGrouping, setUseGrouping] = useState<boolean | null>(auditState.useGrouping);
   const [groupingVariable, setGroupingVariable] = useState<string | null>(auditState.groupingVariable);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGroupingChange = (value: string) => {
     setUseGrouping(value === 'true');
@@ -40,16 +43,41 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
 
   const handleFinish = async () => {
     setIsGenerating(true);
+    setError(null);
     
-    // Simulate audit generation
-    setTimeout(() => {
-      onComplete({
+    try {
+      // Prepare audit request
+      const auditRequest = {
+        auditState: {
+          ...auditState,
+          useGrouping,
+          groupingVariable,
+        },
+        data: auditState.uploadedFile || undefined,
+        modelScript: auditState.customModelFile || undefined,
+      };
+      
+      // Call the real audit API
+      const response = await auditAPI.startAudit(auditRequest);
+      
+      console.log('Step6Grouping: Audit response received:', response);
+      
+      // Store the session ID and results
+      const updatedAuditState = {
         useGrouping,
         groupingVariable,
-      });
+        auditResults: response,
+        sessionId: response.sessionId,
+      };
+      
+      onComplete(updatedAuditState);
       setIsGenerating(false);
-      onFinish();
-    }, 3000);
+      onFinish(updatedAuditState);
+    } catch (err) {
+      console.error('Audit failed:', err);
+      setError(err instanceof Error ? err.message : 'Audit failed. Please try again.');
+      setIsGenerating(false);
+    }
   };
 
   const canProceed = useGrouping !== null;
@@ -134,6 +162,13 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
           </Box>
         </CardContent>
       </Card>
+
+      {/* Error Display */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Navigation */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>

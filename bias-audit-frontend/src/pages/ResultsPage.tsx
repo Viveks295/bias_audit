@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -14,6 +14,8 @@ import {
   TableRow,
   Paper,
   Chip,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -29,60 +31,65 @@ import {
   Line,
 } from 'recharts';
 import { AuditState, AuditResult } from '../types';
+import { auditAPI } from '../services/api';
 import DownloadIcon from '@mui/icons-material/Download';
 
 const ResultsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const auditState: AuditState = location.state?.auditState;
+  
+  const [results, setResults] = useState<AuditResult[]>([]);
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data for demonstration
-  const mockResults: AuditResult[] = [
-    {
-      variation: 'spelling',
-      magnitude: 30,
-      originalGrade: 85,
-      perturbedGrade: 78,
-      difference: -7,
-      biasMeasures: {
-        bias_0: -7,
-        bias_1: -0.23,
-        bias_2: -0.15,
-        bias_3: -0.47,
-      },
-      group: 'Group A',
-    },
-    {
-      variation: 'spanglish',
-      magnitude: 50,
-      originalGrade: 85,
-      perturbedGrade: 72,
-      difference: -13,
-      biasMeasures: {
-        bias_0: -13,
-        bias_1: -0.26,
-        bias_2: -0.18,
-        bias_3: -0.87,
-      },
-      group: 'Group A',
-    },
-    {
-      variation: 'noun_transfer',
-      magnitude: 40,
-      originalGrade: 85,
-      perturbedGrade: 80,
-      difference: -5,
-      biasMeasures: {
-        bias_0: -5,
-        bias_1: -0.13,
-        bias_2: -0.08,
-        bias_3: -0.33,
-      },
-      group: 'Group A',
-    },
-  ];
+  useEffect(() => {
+    const loadResults = async () => {
+      console.log('ResultsPage: auditState received:', auditState);
+      
+      // First, try to use results from the audit response (most common case)
+      if (auditState?.auditResults) {
+        console.log('ResultsPage: Using audit results from response');
+        setResults(auditState.auditResults.results);
+        setSummary(auditState.auditResults.summary);
+        return;
+      }
 
-  const chartData = mockResults.map(result => ({
+      // Fallback: try to fetch results using session ID
+      if (auditState?.sessionId) {
+        console.log('ResultsPage: No audit results in state, trying to fetch using sessionId:', auditState.sessionId);
+        
+        // Check if this looks like a CSV session ID (csv_*) instead of an audit session ID (audit_*)
+        if (auditState.sessionId.startsWith('csv_')) {
+          console.log('ResultsPage: Detected CSV session ID, this indicates a session ID mismatch');
+          setError('Session ID mismatch detected. Please complete the audit process again.');
+          return;
+        }
+        
+        setLoading(true);
+        try {
+          const response = await auditAPI.getResults(auditState.sessionId);
+          setResults(response.results);
+          setSummary(response.summary);
+        } catch (err) {
+          console.error('Failed to load results:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load audit results');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // No results available
+      console.log('ResultsPage: No audit results or session ID found');
+      setError('No audit results found');
+    };
+
+    loadResults();
+  }, [auditState]);
+
+  const chartData = results.map(result => ({
     variation: result.variation,
     difference: result.difference,
     bias_1: result.biasMeasures.bias_1,
@@ -90,21 +97,39 @@ const ResultsPage: React.FC = () => {
     bias_3: result.biasMeasures.bias_3,
   }));
 
-  const handleDownloadResults = () => {
-    // Simulate download
-    const csvContent = "data:text/csv;charset=utf-8," + 
-      "Variation,Magnitude,Original Grade,Perturbed Grade,Difference,Bias_0,Bias_1,Bias_2,Bias_3,Group\n" +
-      mockResults.map(r => 
-        `${r.variation},${r.magnitude},${r.originalGrade},${r.perturbedGrade},${r.difference},${r.biasMeasures.bias_0},${r.biasMeasures.bias_1},${r.biasMeasures.bias_2},${r.biasMeasures.bias_3},${r.group}`
-      ).join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "audit_results.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadResults = async () => {
+    if (!auditState?.sessionId) {
+      // Fallback to client-side download if no session ID
+      const csvContent = "data:text/csv;charset=utf-8," + 
+        "Variation,Magnitude,Original Grade,Perturbed Grade,Difference,Bias_0,Bias_1,Bias_2,Bias_3,Group\n" +
+        results.map((r: AuditResult) => 
+          `${r.variation},${r.magnitude},${r.originalGrade},${r.perturbedGrade},${r.difference},${r.biasMeasures.bias_0},${r.biasMeasures.bias_1},${r.biasMeasures.bias_2},${r.biasMeasures.bias_3},${r.group || ''}`
+        ).join("\n");
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "audit_results.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    try {
+      const blob = await auditAPI.downloadResults(auditState.sessionId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `audit_results_${auditState.sessionId}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+      setError('Failed to download results');
+    }
   };
 
   if (!auditState) {
@@ -117,6 +142,34 @@ const ResultsPage: React.FC = () => {
           <Typography variant="body1" color="text.secondary" paragraph>
             Please complete an audit first to view results.
           </Typography>
+          <Button variant="contained" onClick={() => navigate('/audit')}>
+            Start New Audit
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg">
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
+            Loading Audit Results...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg">
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
           <Button variant="contained" onClick={() => navigate('/audit')}>
             Start New Audit
           </Button>
@@ -144,7 +197,7 @@ const ResultsPage: React.FC = () => {
               Total Variations
             </Typography>
             <Typography variant="h4">
-              {mockResults.length}
+              {summary?.totalVariations || results.length}
             </Typography>
           </CardContent>
         </Card>
@@ -154,7 +207,7 @@ const ResultsPage: React.FC = () => {
               Average Grade Change
             </Typography>
             <Typography variant="h4" color="error.main">
-              -8.3
+              {summary?.averageGradeChange?.toFixed(1) || 'N/A'}
             </Typography>
           </CardContent>
         </Card>
@@ -164,7 +217,7 @@ const ResultsPage: React.FC = () => {
               Max Bias Measure
             </Typography>
             <Typography variant="h4" color="warning.main">
-              -0.87
+              {summary?.maxBiasMeasure?.toFixed(3) || 'N/A'}
             </Typography>
           </CardContent>
         </Card>
@@ -174,7 +227,7 @@ const ResultsPage: React.FC = () => {
               Groups Analyzed
             </Typography>
             <Typography variant="h4">
-              1
+              {summary?.groupsAnalyzed || 1}
             </Typography>
           </CardContent>
         </Card>
@@ -249,7 +302,7 @@ const ResultsPage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {mockResults.map((result, index) => (
+                {results.map((result: AuditResult, index: number) => (
                   <TableRow key={index}>
                     <TableCell>
                       <Chip label={result.variation} size="small" />
@@ -277,7 +330,7 @@ const ResultsPage: React.FC = () => {
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell>{result.group}</TableCell>
+                    <TableCell>{result.group || '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

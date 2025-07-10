@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 import importlib.util
 from ai_bias_audit.auditor import Auditor
 from ai_bias_audit.variations import get_variation
-import openai
+from openai import OpenAI
 import random
 
 app = Flask(__name__)
@@ -94,7 +94,20 @@ def start_audit():
     try:
         # Get audit state from form data
         audit_state_json = request.form.get('auditState')
-        audit_state = json.loads(audit_state_json)
+        if not audit_state_json:
+            return jsonify({'error': 'No audit state provided'}), 400
+        
+        try:
+            audit_state = json.loads(audit_state_json)
+        except json.JSONDecodeError as e:
+            return jsonify({'error': f'Invalid audit state JSON: {str(e)}'}), 400
+        
+        # Validate audit state structure
+        if not isinstance(audit_state, dict):
+            return jsonify({'error': 'Audit state must be an object'}), 400
+        
+        if 'selectedVariations' not in audit_state:
+            return jsonify({'error': 'No variations selected in audit state'}), 400
         
         # Handle file uploads
         data_file = request.files.get('data')
@@ -109,69 +122,141 @@ def start_audit():
             'status': 'processing'
         }
         
-        # For now, return mock results
-        # In a real implementation, you would:
-        # 1. Load the data file
-        # 2. Set up the model
-        # 3. Run the actual audit
-        # 4. Store results
+        # Load the data file
+        if not data_file:
+            return jsonify({'error': 'No data file provided'}), 400
         
-        mock_results = [
-            {
-                'variation': 'spelling',
-                'magnitude': 30,
-                'originalGrade': 85,
-                'perturbedGrade': 78,
-                'difference': -7,
-                'biasMeasures': {
-                    'bias_0': -7,
-                    'bias_1': -0.23,
-                    'bias_2': -0.15,
-                    'bias_3': -0.47,
-                },
-                'group': 'Group A',
-            },
-            {
-                'variation': 'spanglish',
-                'magnitude': 50,
-                'originalGrade': 85,
-                'perturbedGrade': 72,
-                'difference': -13,
-                'biasMeasures': {
-                    'bias_0': -13,
-                    'bias_1': -0.26,
-                    'bias_2': -0.18,
-                    'bias_3': -0.87,
-                },
-                'group': 'Group A',
-            },
-        ]
+        df = pd.read_csv(data_file)
+        if 'text' not in df.columns:
+            return jsonify({'error': 'CSV must contain a "text" column'}), 400
         
-        audit_sessions[session_id]['results'] = mock_results
+        # Set up the model based on audit state
+        model_type = audit_state.get('selectedLLM', {}).get('type', 'custom')
+        ai_prompt = audit_state.get('aiPrompt', '')
+        rubric = audit_state.get('rubric', '')
+        
+        if model_type == 'custom':
+            # Load custom model from stored file
+            if not model_script:
+                return jsonify({"error": "Custom model file required"}), 400
+            
+            # Save model script to temporary location
+            temp_dir = tempfile.mkdtemp(prefix="custom_model_")
+            model_path = os.path.join(temp_dir, model_script.filename)
+            model_script.save(model_path)
+            
+            spec = importlib.util.spec_from_file_location("model_module", model_path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            if not hasattr(mod, "grade"):
+                return jsonify({"error": "Custom script must define grade(text)"}), 500
+            grade_fn = mod.grade
+        else:
+            # Use OpenAI API for grading
+            client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+            if not os.environ.get('OPENAI_API_KEY'):
+                return jsonify({'error': 'OpenAI API key not set'}), 500
+            def grade_fn(text: str) -> float:
+                prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
+                try:
+                    response = client.chat.completions.create(
+                        model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=10,
+                        temperature=0
+                    )
+                    pred = response.choices[0].message.content.strip()
+                    return float(pred)
+                except Exception:
+                    return float('nan')
+        
+        # Run the actual audit
+        from ai_bias_audit.auditor import Auditor
+        
+        # Apply score cutoff if specified
+        score_cutoff = None
+        if audit_state.get('useScoreCutoff') and audit_state.get('cutoffScore'):
+            score_cutoff = float(audit_state['cutoffScore'])
+        
+        # Get grouping variable if specified
+        group_col = None
+        if audit_state.get('useGrouping') and audit_state.get('groupingVariable'):
+            group_col = audit_state['groupingVariable']
+        
+        # Get variations and magnitudes
+        variations = [v['id'] for v in audit_state.get('selectedVariations', [])]
+        magnitudes = [audit_state.get('variationMagnitudes', {}).get(v['id'], 50) for v in audit_state.get('selectedVariations', [])]
+        
+        if not variations:
+            return jsonify({'error': 'No variations selected'}), 400
+        
+        # Debug logging
+        print(f"Selected variations: {variations}")
+        print(f"Selected magnitudes: {magnitudes}")
+        
+        # Create auditor and run audit
+        auditor = Auditor(model=grade_fn, data=df)
+        bias_df = auditor.audit(variations, magnitudes, score_cutoff=score_cutoff, group_col=group_col)
+        
+        # Convert results to the expected format
+        results = []
+        for _, row in bias_df.iterrows():
+            result = {
+                'variation': row['variation'],
+                'magnitude': row['magnitude'],
+                'originalGrade': float(row['original_grade']),
+                'perturbedGrade': float(row['perturbed_grade']),
+                'difference': float(row['difference']),
+                'biasMeasures': {
+                    'bias_0': float(row['bias_0']),
+                    'bias_1': float(row['bias_1']),
+                    'bias_2': float(row['bias_2']),
+                    'bias_3': float(row['bias_3']),
+                }
+            }
+            if 'group' in row:
+                result['group'] = str(row['group'])
+            results.append(result)
+        
+        # Calculate summary statistics
+        total_variations = len(set(r['variation'] for r in results))
+        average_grade_change = sum(r['difference'] for r in results) / len(results)
+        max_bias_measure = max(abs(r['biasMeasures']['bias_1']) for r in results)
+        groups_analyzed = len(set(r.get('group', 'default') for r in results))
+        
+        audit_sessions[session_id]['results'] = results
         audit_sessions[session_id]['status'] = 'completed'
         
         return jsonify({
             'sessionId': session_id,
             'status': 'completed',
-            'results': mock_results,
+            'results': results,
             'summary': {
-                'totalVariations': len(mock_results),
-                'averageGradeChange': -10,
-                'maxBiasMeasure': -0.87,
-                'groupsAnalyzed': 1,
+                'totalVariations': total_variations,
+                'averageGradeChange': average_grade_change,
+                'maxBiasMeasure': max_bias_measure,
+                'groupsAnalyzed': groups_analyzed,
             }
         })
         
     except Exception as e:
+        print(f"Audit error: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @api.route('/api/results/<session_id>', methods=['GET'])
 def get_results(session_id):
     """Get audit results for a session."""
-    if session_id not in audit_sessions:
-        return jsonify({'error': 'Session not found'}), 404
+    # Check both audit_sessions and csv_storage
+    session_data = None
     
-    session_data = audit_sessions[session_id]
+    if session_id in audit_sessions:
+        session_data = audit_sessions[session_id]
+    elif session_id in csv_storage:
+        # If it's a csv session, we need to check if there are any audit results
+        # For now, return an error indicating this session doesn't have audit results
+        return jsonify({'error': 'This session does not contain audit results. Please run an audit first.'}), 404
+    else:
+        return jsonify({'error': 'Session not found'}), 404
     
     if session_data['status'] != 'completed':
         return jsonify({'error': 'Audit not completed'}), 400
@@ -263,8 +348,6 @@ def assess_performance():
     # Handle custom model file storage
     if model_type == 'custom' and custom_model_file:
         # Save custom model file to persistent location
-        import tempfile
-        import os
         temp_dir = tempfile.mkdtemp(prefix="custom_model_")
         model_path = os.path.join(temp_dir, custom_model_file.filename)
         custom_model_file.save(model_path)
@@ -311,20 +394,20 @@ def assess_performance():
             return jsonify({'error': f'Error loading custom model: {str(e)}'}), 500
     else:
         # Use OpenAI API for grading
-        openai.api_key = os.environ.get('OPENAI_API_KEY')
-        if not openai.api_key:
+        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        if not os.environ.get('OPENAI_API_KEY'):
             return jsonify({'error': 'OpenAI API key not set'}), 500
         for _, row in sample_df.iterrows():
             text = row['text']
             prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=10,
                     temperature=0
                 )
-                pred = response['choices'][0]['message']['content'].strip()
+                pred = response.choices[0].message.content.strip()
             except Exception as e:
                 pred = f"Error: {str(e)}"
             pred_grades.append(pred)
@@ -468,20 +551,19 @@ def preview_audit():
         grade_fn = mod.grade
     else:
         # Use OpenAI API for grading
-        import openai
-        openai.api_key = os.environ.get('OPENAI_API_KEY')
-        if not openai.api_key:
+        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        if not os.environ.get('OPENAI_API_KEY'):
             return jsonify({'error': 'OpenAI API key not set'}), 500
         def grade_fn(text: str) -> float:
             prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=10,
                     temperature=0
                 )
-                pred = response['choices'][0]['message']['content'].strip()
+                pred = response.choices[0].message.content.strip()
                 return float(pred)
             except Exception:
                 return float('nan')

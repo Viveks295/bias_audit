@@ -17,6 +17,8 @@ export interface AuditRequest {
 }
 
 export interface AuditResponse {
+  sessionId: string;
+  status: string;
   results: AuditResult[];
   summary: {
     totalVariations: number;
@@ -40,7 +42,7 @@ export const auditAPI = {
       formData.append('modelScript', request.modelScript);
     }
 
-    const response = await api.post('/audit', formData, {
+    const response = await api.post('/api/audit', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -51,13 +53,13 @@ export const auditAPI = {
 
   // Get available variations
   getVariations: async () => {
-    const response = await api.get('/variations');
+    const response = await api.get('/api/variations');
     return response.data;
   },
 
   // Preview a variation
   previewVariation: async (variationName: string, magnitude: number, nSamples: number = 5) => {
-    const response = await api.post('/preview', {
+    const response = await api.post('/api/preview', {
       variationName,
       magnitude,
       nSamples,
@@ -67,13 +69,13 @@ export const auditAPI = {
 
   // Get audit results
   getResults: async (auditId: string): Promise<AuditResponse> => {
-    const response = await api.get(`/results/${auditId}`);
+    const response = await api.get(`/api/results/${auditId}`);
     return response.data;
   },
 
   // Download results as CSV
   downloadResults: async (auditId: string): Promise<Blob> => {
-    const response = await api.get(`/download/${auditId}`, {
+    const response = await api.get(`/api/download/${auditId}`, {
       responseType: 'blob',
     });
     return response.data;
