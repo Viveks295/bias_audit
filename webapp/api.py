@@ -4,6 +4,7 @@ import pandas as pd
 import tempfile
 import os
 import json
+import traceback
 from typing import Dict, Any, List
 import importlib.util
 from ai_bias_audit.auditor import Auditor
@@ -209,9 +210,6 @@ def start_audit():
                 except Exception:
                     return float('nan')
         
-        # Run the actual audit
-        from ai_bias_audit.auditor import Auditor
-        
         # Apply score cutoff if specified
         score_cutoff = None
         if audit_state.get('useScoreCutoff') and audit_state.get('cutoffScore'):
@@ -247,7 +245,6 @@ def start_audit():
                 print(f"Successfully calculated {len(moments)} moments")
             except Exception as e:
                 print(f"Moments calculation error during audit: {str(e)}")
-                import traceback
                 traceback.print_exc()
                 moments = []
         else:
@@ -356,7 +353,6 @@ def get_results(session_id):
         })
     except Exception as e:
         print(f"Error in get_results for session {session_id}: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
@@ -649,8 +645,6 @@ def preview_audit():
             except Exception:
                 return float('nan')
 
-    import pandas as pd
-    from ai_bias_audit.auditor import Auditor
     df_preview = pd.DataFrame({"text": sample_texts})
     auditor = Auditor(model=grade_fn, data=df_preview)
     bias_df = auditor.audit([variation], [magnitude])

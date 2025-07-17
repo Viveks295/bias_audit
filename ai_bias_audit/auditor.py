@@ -25,10 +25,6 @@ class Auditor:
         # Add feature columns if not present
         if 'num_words' not in self.data.columns:
             self.data['num_words'] = self.data['text'].apply(count_words)
-        if 'num_nouns' not in self.data.columns:
-            self.data['num_nouns'] = self.data['text'].apply(count_nouns)
-        if 'num_cognates' not in self.data.columns:
-            self.data['num_cognates'] = self.data['text'].apply(count_cognates)
 
     def grade(self, texts: pd.DataFrame = None) -> pd.DataFrame:
         """
@@ -86,6 +82,12 @@ class Auditor:
         """
         if len(variations) != len(magnitudes):
             raise ValueError("Variations and magnitudes must have the same length.")
+
+        # Conditionally compute num_nouns and num_cognates if needed
+        if ('noun_transfer' in variations) and ('num_nouns' not in self.data.columns):
+            self.data['num_nouns'] = self.data['text'].apply(count_nouns)
+        if ('cognates' in variations) and ('num_cognates' not in self.data.columns):
+            self.data['num_cognates'] = self.data['text'].apply(count_cognates)
 
         # Grade original texts 
         original = self.grade()
@@ -157,7 +159,7 @@ class Auditor:
             # Compute bias measures
             self.results['bias_0'] = err
             self.results['bias_1'] = err / m.replace(0, 1e-8)
-            self.results['bias_2'] = err / ((m * self.results['pert']).replace(0, 1e-8) + 0.005)
+            self.results['bias_2'] = err / ((m * self.results['pert']).replace(0, 1e-8))
             self.results['bias_3'] = err / (1 - orig.replace(1, 1-1e-8))
             # Drop helper columns
             self.results.drop(columns=['feature_col', 'feature_val', 'num_words_val', 'pert'], inplace=True)
