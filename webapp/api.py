@@ -26,28 +26,26 @@ csv_storage = {}
 def send_email_notification(email: str, session_id: str, base_url: str = "http://localhost:3000"):
     """Send email notification when audit is complete."""
     try:
-        # For now, we'll use a simple print statement
-        # In production, you would configure SMTP settings
-        print(f"EMAIL NOTIFICATION: Audit {session_id} is complete!")
-        print(f"Sending email to: {email}")
-        print(f"Results URL: {base_url}/results?sessionId={session_id}")
-        
-        # TODO: Implement actual email sending
-        # This would require SMTP configuration
-        # Example implementation:
-        # msg = MIMEMultipart()
-        # msg['From'] = 'noreply@biasaudit.com'
-        # msg['To'] = email
-        # msg['Subject'] = 'Your Bias Audit is Ready!'
-        # body = f"Your bias audit is complete. View results at: {base_url}/results?sessionId={session_id}"
-        # msg.attach(MIMEText(body, 'plain'))
-        # 
-        # server = smtplib.SMTP('smtp.gmail.com', 587)
-        # server.starttls()
-        # server.login('your-email@gmail.com', 'your-password')
-        # server.send_message(msg)
-        # server.quit()
-        
+        results_url = f"{base_url}/results?sessionId={session_id}"
+        subject = "Your Bias Audit is Ready!"
+        body = f"Your bias audit is complete. View your results here: {results_url}"
+
+        if not EMAIL_ENABLED:
+            print(f"[EMAIL DISABLED] Would send to: {email}\nSubject: {subject}\nBody: {body}")
+            return False
+
+        msg = MIMEMultipart()
+        msg['From'] = FROM_EMAIL
+        msg['To'] = email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        print(f"Email notification sent to {email} for session {session_id}")
         return True
     except Exception as e:
         print(f"Failed to send email notification: {str(e)}")

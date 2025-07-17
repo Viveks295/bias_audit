@@ -54,6 +54,7 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
           ...auditState,
           useGrouping,
           groupingVariable,
+          notificationEmail, 
         },
         data: auditState.uploadedFile || undefined,
         modelScript: auditState.customModelFile || undefined,
@@ -111,7 +112,7 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
           <Typography variant="body2" color="text.secondary" paragraph>
             Group your results by demographic or other variables for detailed bias analysis.
           </Typography>
-          
+        
           <FormControl component="fieldset" sx={{ mb: 2 }}>
             <RadioGroup
               value={useGrouping === null ? '' : useGrouping.toString()}

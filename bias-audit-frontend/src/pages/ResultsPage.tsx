@@ -40,8 +40,16 @@ import DownloadIcon from '@mui/icons-material/Download';
 const ResultsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const auditState: AuditState = location.state?.auditState;
-  
+  // Parse sessionId from URL query params if present
+  let sessionIdFromQuery: string | null = null;
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(location.search);
+    sessionIdFromQuery = params.get('sessionId');
+  }
+  // Prefer navigation state, but fallback to sessionId from query
+  const auditState: AuditState | undefined = location.state?.auditState;
+  const sessionId: string | undefined = auditState?.sessionId || sessionIdFromQuery || undefined;
+
   const [results, setResults] = useState<AuditResult[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [moments, setMoments] = useState<any[]>([]);
@@ -50,43 +58,36 @@ const ResultsPage: React.FC = () => {
 
   useEffect(() => {
     const loadResults = async () => {
-      console.log('ResultsPage: auditState received:', auditState);
-      // First, try to use results from the audit response (most common case)
+      // If auditState has auditResults (navigated from audit flow), use them
       if (auditState?.auditResults) {
-        console.log('ResultsPage: Using audit results from response');
         setResults(auditState.auditResults.results);
         setSummary(auditState.auditResults.summary);
         setMoments(auditState.auditResults.moments || []);
         return;
       }
-      // Fallback: try to fetch results using session ID
-      if (auditState?.sessionId) {
-        console.log('ResultsPage: No audit results in state, trying to fetch using sessionId:', auditState.sessionId);
-        if (auditState.sessionId.startsWith('csv_')) {
-          console.log('ResultsPage: Detected CSV session ID, this indicates a session ID mismatch');
+      // Otherwise, fetch using sessionId
+      if (sessionId) {
+        if (sessionId.startsWith('csv_')) {
           setError('Session ID mismatch detected. Please complete the audit process again.');
           return;
         }
         setLoading(true);
         try {
-          const response = await auditAPI.getResults(auditState.sessionId);
+          const response = await auditAPI.getResults(sessionId);
           setResults(response.results);
           setSummary(response.summary);
           setMoments(response.moments || []);
         } catch (err) {
-          console.error('Failed to load results:', err);
           setError(err instanceof Error ? err.message : 'Failed to load audit results');
         } finally {
           setLoading(false);
         }
         return;
       }
-      // No results available
-      console.log('ResultsPage: No audit results or session ID found');
       setError('No audit results found');
     };
     loadResults();
-  }, [auditState]);
+  }, [auditState?.auditResults, sessionId]);
 
   // Calculate bias_0 mean for each variation
   const variationBiasMeans = results.reduce((acc, result) => {
@@ -197,7 +198,7 @@ const ResultsPage: React.FC = () => {
   });
 
   const handleDownloadResults = async () => {
-    if (!auditState?.sessionId) {
+    if (!sessionId) {
       // Fallback to client-side download if no session ID
       const csvContent = "data:text/csv;charset=utf-8," + 
         "Variation,Magnitude,Original Grade,Perturbed Grade,Difference,Bias_0,Bias_1,Bias_2,Bias_3,Group\n" +
@@ -216,11 +217,11 @@ const ResultsPage: React.FC = () => {
     }
 
     try {
-      const blob = await auditAPI.downloadResults(auditState.sessionId);
+      const blob = await auditAPI.downloadResults(sessionId);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `audit_results_${auditState.sessionId}.csv`;
+      link.download = `audit_results_${sessionId}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -267,7 +268,8 @@ const ResultsPage: React.FC = () => {
   });
   const mostSensitiveVariation = Object.entries(variationBias0Means).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
 
-  if (!auditState) {
+  // Remove auditState check. Show 'No Audit Results Found' only if no results, not loading, and no error.
+  if (!loading && !error && results.length === 0) {
     return (
       <Container maxWidth="lg">
         <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -462,99 +464,23 @@ const ResultsPage: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Variation</TableCell>
-                    <TableCell>Magnitude</TableCell>
-                    {auditState?.useGrouping && <TableCell>Group</TableCell>}
-                    <TableCell>Bias 0 Mean</TableCell>
-                    {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                      <TableCell>Bias 0 Variance</TableCell>
-                    )}
-                    {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                      <TableCell>Bias 0 Skewness</TableCell>
-                    )}
-                                          {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_1') && (
-                        <>
-                          <TableCell>Bias 1 Mean</TableCell>
-                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                            <TableCell>Bias 1 Variance</TableCell>
-                          )}
-                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                            <TableCell>Bias 1 Skewness</TableCell>
-                          )}
-                        </>
-                      )}
-                                          {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_2') && (
-                        <>
-                          <TableCell>Bias 2 Mean</TableCell>
-                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                            <TableCell>Bias 2 Variance</TableCell>
-                          )}
-                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                            <TableCell>Bias 2 Skewness</TableCell>
-                          )}
-                        </>
-                      )}
-                                          {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_3') && (
-                        <>
-                          <TableCell>Bias 3 Mean</TableCell>
-                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                            <TableCell>Bias 3 Variance</TableCell>
-                          )}
-                          {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                            <TableCell>Bias 3 Skewness</TableCell>
-                          )}
-                        </>
-                      )}
+                    {/* Dynamically render columns based on keys in moments[0] */}
+                    {moments[0] && Object.keys(moments[0]).map((key) => (
+                      <TableCell key={key}>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
+                    ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {moments.map((moment: any, index: number) => (
                     <TableRow key={index}>
-                      <TableCell>
-                        <Chip label={moment.variation} size="small" />
-                      </TableCell>
-                      <TableCell>{moment.magnitude}</TableCell>
-                      {auditState?.useGrouping && <TableCell>{moment.group || '-'}</TableCell>}
-                      <TableCell>{moment.bias_0_mean?.toFixed(3) || 'N/A'}</TableCell>
-                      {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                        <TableCell>{moment.bias_0_var?.toFixed(3) || 'N/A'}</TableCell>
-                      )}
-                      {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                        <TableCell>{moment.bias_0_skew?.toFixed(3) || 'N/A'}</TableCell>
-                      )}
-                                              {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_1') && (
-                          <>
-                            <TableCell>{moment.bias_1_mean?.toFixed(3) || 'N/A'}</TableCell>
-                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                              <TableCell>{moment.bias_1_var?.toFixed(3) || 'N/A'}</TableCell>
-                            )}
-                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                              <TableCell>{moment.bias_1_skew?.toFixed(3) || 'N/A'}</TableCell>
-                            )}
-                          </>
-                        )}
-                                              {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_2') && (
-                          <>
-                            <TableCell>{moment.bias_2_mean?.toFixed(3) || 'N/A'}</TableCell>
-                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                              <TableCell>{moment.bias_2_var?.toFixed(3) || 'N/A'}</TableCell>
-                            )}
-                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                              <TableCell>{moment.bias_2_skew?.toFixed(3) || 'N/A'}</TableCell>
-                            )}
-                          </>
-                        )}
-                                              {auditState?.useAdditionalMeasures && auditState?.selectedMeasures?.includes('bias_3') && (
-                          <>
-                            <TableCell>{moment.bias_3_mean?.toFixed(3) || 'N/A'}</TableCell>
-                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('variance') && (
-                              <TableCell>{moment.bias_3_var?.toFixed(3) || 'N/A'}</TableCell>
-                            )}
-                            {auditState?.useHigherMoments && auditState?.selectedMoments?.includes('skewness') && (
-                              <TableCell>{moment.bias_3_skew?.toFixed(3) || 'N/A'}</TableCell>
-                            )}
-                          </>
-                        )}
+                      {Object.keys(moments[0]).map((key) => (
+                        <TableCell key={key}>
+                          {/* Render as Chip for variation, else as text/number */}
+                          {key === 'variation' ? (
+                            <Chip label={moment[key]} size="small" />
+                          ) : (typeof moment[key] === 'number' ? moment[key]?.toFixed(3) : (moment[key] ?? 'N/A'))}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>
