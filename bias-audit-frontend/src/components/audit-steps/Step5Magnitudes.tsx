@@ -27,12 +27,67 @@ const Step5Magnitudes: React.FC<Step5MagnitudesProps> = ({
   const [variationMagnitudes, setVariationMagnitudes] = useState<Record<string, number>>(
     auditState.variationMagnitudes
   );
+  // Add a separate state for the text field values (can be string or empty)
+  const [magnitudeInputs, setMagnitudeInputs] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    auditState.selectedVariations.forEach((variation: Variation) => {
+      const val = auditState.variationMagnitudes[variation.id];
+      initial[variation.id] = val !== undefined ? String(val) : String(variation.defaultMagnitude);
+    });
+    return initial;
+  });
 
   const handleMagnitudeChange = (variationId: string, value: number) => {
     setVariationMagnitudes(prev => ({
       ...prev,
       [variationId]: value,
     }));
+    setMagnitudeInputs(prev => ({
+      ...prev,
+      [variationId]: String(value),
+    }));
+  };
+
+  // Handle text input change (allow empty string)
+  const handleMagnitudeInputChange = (variationId: string, value: string) => {
+    // Allow empty string for editing
+    setMagnitudeInputs(prev => ({
+      ...prev,
+      [variationId]: value,
+    }));
+    // Only update the number state if the value is a valid number
+    const num = Number(value);
+    if (value !== '' && !isNaN(num)) {
+      setVariationMagnitudes(prev => ({
+        ...prev,
+        [variationId]: num,
+      }));
+    }
+  };
+
+  // On blur, if the input is empty or invalid, reset to default or last valid value
+  const handleMagnitudeInputBlur = (variation: Variation) => {
+    const value = magnitudeInputs[variation.id];
+    const num = Number(value);
+    if (value === '' || isNaN(num)) {
+      // Reset to last valid value or default
+      const fallback = variationMagnitudes[variation.id] ?? variation.defaultMagnitude;
+      setMagnitudeInputs(prev => ({
+        ...prev,
+        [variation.id]: String(fallback),
+      }));
+    } else {
+      // Clamp to range
+      const clamped = Math.max(variation.magnitudeRange[0], Math.min(num, variation.magnitudeRange[1]));
+      setVariationMagnitudes(prev => ({
+        ...prev,
+        [variation.id]: clamped,
+      }));
+      setMagnitudeInputs(prev => ({
+        ...prev,
+        [variation.id]: String(clamped),
+      }));
+    }
   };
 
   const handleNext = () => {
@@ -63,7 +118,7 @@ const Step5Magnitudes: React.FC<Step5MagnitudesProps> = ({
             
             <Box sx={{ px: 2 }}>
               <Slider
-                value={variationMagnitudes[variation.id] || variation.defaultMagnitude}
+                value={variationMagnitudes[variation.id] ?? variation.defaultMagnitude}
                 onChange={(_, value) => handleMagnitudeChange(variation.id, value as number)}
                 min={variation.magnitudeRange[0]}
                 max={variation.magnitudeRange[1]}
@@ -79,8 +134,9 @@ const Step5Magnitudes: React.FC<Step5MagnitudesProps> = ({
               <TextField
                 label="Magnitude Value"
                 type="number"
-                value={variationMagnitudes[variation.id] || variation.defaultMagnitude}
-                onChange={(e) => handleMagnitudeChange(variation.id, Number(e.target.value))}
+                value={magnitudeInputs[variation.id] ?? ''}
+                onChange={(e) => handleMagnitudeInputChange(variation.id, e.target.value)}
+                onBlur={() => handleMagnitudeInputBlur(variation)}
                 inputProps={{
                   min: variation.magnitudeRange[0],
                   max: variation.magnitudeRange[1],
