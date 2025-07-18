@@ -103,11 +103,21 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
   };
 
   const handleMomentToggle = (momentId: string) => {
-    setSelectedMoments(prev => 
-      prev.includes(momentId)
-        ? prev.filter(id => id !== momentId)
-        : [...prev, momentId]
-    );
+    // If toggling off variance, also remove skewness
+    if (momentId === 'variance' && selectedMoments.includes('variance')) {
+      setSelectedMoments(prev => prev.filter(id => id !== 'variance' && id !== 'skewness'));
+    } else if (momentId === 'skewness' && !selectedMoments.includes('skewness')) {
+      // Only allow skewness if variance is selected
+      if (selectedMoments.includes('variance')) {
+        setSelectedMoments(prev => [...prev, 'skewness']);
+      }
+    } else {
+      setSelectedMoments(prev =>
+        prev.includes(momentId)
+          ? prev.filter(id => id !== momentId)
+          : [...prev, momentId]
+      );
+    }
   };
 
   const handleNext = () => {
@@ -120,7 +130,7 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
     onNext();
   };
 
-  const canProceed = useAdditionalMeasures !== null;
+  const canProceed = useAdditionalMeasures !== null && useHigherMoments !== null;
 
   // Determine which bias and moment columns to show
   const coreBiasCols = ['index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'difference', 'group'];
@@ -298,6 +308,9 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
               {['variance', 'skewness'].map((momentId) => {
                 const moment = availableMoments.find(m => m.id === momentId);
                 if (!moment) return null;
+                // Disable skewness if variance is not selected
+                const isSkewness = momentId === 'skewness';
+                const skewnessDisabled = isSkewness && !selectedMoments.includes('variance');
                 return (
                   <FormControlLabel
                     key={moment.id}
@@ -305,6 +318,7 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
                       <Checkbox
                         checked={selectedMoments.includes(moment.id)}
                         onChange={() => handleMomentToggle(moment.id)}
+                        disabled={skewnessDisabled}
                       />
                     }
                     label={
