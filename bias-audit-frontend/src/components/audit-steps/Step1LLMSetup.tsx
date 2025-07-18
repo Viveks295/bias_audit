@@ -119,6 +119,21 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   const [assessmentSkipped, setAssessmentSkipped] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string | null>(auditState.sessionId || null);
   const [promptError, setPromptError] = useState<string | null>(null);
+  const [hasTrueGrade, setHasTrueGrade] = useState<boolean>(false);
+
+  // Add error states for required fields
+  const [outcomeTypeError, setOutcomeTypeError] = useState<string | null>(null);
+  const [metricError, setMetricError] = useState<string | null>(null);
+  const [llmError, setLlmError] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  // Helper to check required fields
+  const requiredFieldsFilled = hasTrueGrade
+    ? uploadedFile && selectedLLM && outcomeType && selectedMetric && ((selectedLLM && selectedLLM.id === 'custom' && customModelFile) || ((selectedLLM && (selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o')) && aiPrompt))
+    : uploadedFile && selectedLLM && ((selectedLLM && selectedLLM.id === 'custom' && customModelFile) || ((selectedLLM && (selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o')) && aiPrompt));
+
+  // Track if assessment or skip has been done
+  const [assessmentOrSkipDone, setAssessmentOrSkipDone] = useState(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -147,12 +162,16 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         const hasTextColumn = headers.some(header => 
           header.toLowerCase() === 'text'
         );
+        // Check if true_grade column exists
+        const hasTrueGradeColumn = headers.some(header => header.toLowerCase() === 'true_grade');
+        setHasTrueGrade(hasTrueGradeColumn);
         
         if (!hasTextColumn) {
           setUploadError('CSV file must contain a column named "text"');
           setUploadedFile(null);
           setCsvHeaders([]);
           setCsvData([]);
+          setHasTrueGrade(false);
         } else {
           setUploadedFile(file);
         }
@@ -195,16 +214,37 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     setSelectedMetric(metric || null);
   };
 
+  // Update handleAssessPerformance to check required fields and set errors
   const handleAssessPerformance = async () => {
-    if (!selectedLLM || !selectedMetric || !uploadedFile) return;
-    
-    // Check if AI prompt is required and filled
-    if ((selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && !aiPrompt.trim()) {
-      setPromptError('Model AI prompt is required before assessing performance');
-      return;
-    }
-    
+    let hasError = false;
+    setOutcomeTypeError(null);
+    setMetricError(null);
+    setLlmError(null);
+    setFileError(null);
     setPromptError(null);
+    if (!uploadedFile) {
+      setFileError('Please upload a CSV file');
+      hasError = true;
+    }
+    if (!selectedLLM) {
+      setLlmError('Please select a language model');
+      hasError = true;
+    }
+    if (selectedLLM && (selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && !aiPrompt.trim()) {
+      setPromptError('Model AI prompt is required before assessing performance');
+      hasError = true;
+    }
+    if (hasTrueGrade) {
+      if (!outcomeType) {
+        setOutcomeTypeError('Please select an outcome type');
+        hasError = true;
+      }
+      if (!selectedMetric) {
+        setMetricError('Please select a performance metric');
+        hasError = true;
+      }
+    }
+    if (hasError) return;
     setIsAssessing(true);
     setAssessmentError(null);
     setAssessmentResults(null);
@@ -212,26 +252,27 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     setAssessmentMetricValue(null);
     setAssessmentSkipped(false);
     try {
+      if (!uploadedFile || !selectedLLM) return; // type guard
       const response = await auditAPI.assessPerformance({
         csvFile: uploadedFile,
         modelType: selectedLLM.id,
         aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
         rubric: selectedLLM.id !== 'custom' ? rubric : undefined,
-        metric: selectedMetric.id,
-        customModelFile: selectedLLM.id === 'custom' ? customModelFile || undefined : undefined,
+        metric: hasTrueGrade && selectedMetric ? selectedMetric.id : undefined,
+        customModelFile: selectedLLM.id === 'custom' && customModelFile ? customModelFile : undefined,
       });
       setAssessmentResults(response.samples);
       setAssessmentMetric(response.metric);
       setAssessmentMetricValue(response.metric_value);
-      setSessionId(response.session_id);  // Store session_id for later use
-      // Set initial performance and satisfactory if metric is available
-      if (typeof response.metric_value === 'number') {
+      setSessionId(response.session_id);
+      if (hasTrueGrade && typeof response.metric_value === 'number') {
         setInitialPerformance(response.metric_value);
         setPerformanceSatisfactory(response.metric_value >= 0.7);
       } else {
         setInitialPerformance(null);
         setPerformanceSatisfactory(null);
       }
+      setAssessmentOrSkipDone(true);
     } catch (err: any) {
       setAssessmentError(err?.response?.data?.error || err.message || 'Error assessing performance');
     } finally {
@@ -239,28 +280,53 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     }
   };
 
+  // Update handleSkipAssessment to check required fields and set errors
   const handleSkipAssessment = async () => {
-    // Check if AI prompt is required and filled
-    if ((selectedLLM?.id === 'gpt-4.1' || selectedLLM?.id === 'gpt-4o') && !aiPrompt.trim()) {
-      setPromptError('Model AI prompt is required before skipping assessment');
-      return;
-    }
+    let hasError = false;
+    setOutcomeTypeError(null);
+    setMetricError(null);
+    setLlmError(null);
+    setFileError(null);
     setPromptError(null);
+    if (!uploadedFile) {
+      setFileError('Please upload a CSV file');
+      hasError = true;
+    }
+    if (!selectedLLM) {
+      setLlmError('Please select a language model');
+      hasError = true;
+    }
+    if (selectedLLM && (selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && !aiPrompt.trim()) {
+      setPromptError('Model AI prompt is required before skipping assessment');
+      hasError = true;
+    }
+    if (hasTrueGrade) {
+      if (!outcomeType) {
+        setOutcomeTypeError('Please select an outcome type');
+        hasError = true;
+      }
+      if (!selectedMetric) {
+        setMetricError('Please select a performance metric');
+        hasError = true;
+      }
+    }
+    if (hasError) return;
     setAssessmentSkipped(true);
     setInitialPerformance(null);
     setPerformanceSatisfactory(null);
     setAssessmentResults(null);
     setAssessmentMetric(null);
     setAssessmentMetricValue(null);
+    setAssessmentOrSkipDone(true);
     // Create a session for later steps
-    if (uploadedFile && selectedLLM && outcomeType && selectedMetric) {
+    if (uploadedFile && selectedLLM && (hasTrueGrade ? (outcomeType && selectedMetric) : true)) {
       try {
         const resp = await auditAPI.createSession({
           csvFile: uploadedFile,
           modelType: selectedLLM.id,
           aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
           rubric: selectedLLM.id !== 'custom' ? rubric : undefined,
-          customModelFile: selectedLLM.id === 'custom' ? customModelFile || undefined : undefined,
+          customModelFile: selectedLLM.id === 'custom' && customModelFile ? customModelFile : undefined,
         });
         setSessionId(resp.session_id);
       } catch (err: any) {
@@ -270,15 +336,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   };
 
   const handleNext = () => {
-    if (
-      uploadedFile &&
-      selectedLLM &&
-      outcomeType &&
-      ((selectedLLM.id === 'custom' && customModelFile) ||
-        ((selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && aiPrompt)) &&
-      selectedMetric &&
-      (assessmentSkipped || assessmentResults)
-    ) {
+    if (assessmentOrSkipDone) {
       onComplete({
         uploadedFile,
         filePreview,
@@ -287,23 +345,17 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         selectedMetric,
         initialPerformance,
         performanceSatisfactory,
-        customModelFile: selectedLLM.id === 'custom' ? customModelFile : undefined,
-        aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
-        rubric: selectedLLM.id !== 'custom' && rubric ? rubric : undefined,
+        ...(selectedLLM && selectedLLM.id === 'custom' ? { customModelFile } : {}),
+        ...(selectedLLM && selectedLLM.id !== 'custom' ? { aiPrompt } : {}),
+        ...(selectedLLM && selectedLLM.id !== 'custom' && rubric ? { rubric } : {}),
         sessionId: sessionId || undefined,
       });
       onNext();
     }
   };
 
-  const canProceed =
-    uploadedFile &&
-    selectedLLM &&
-    outcomeType &&
-    ((selectedLLM.id === 'custom' && customModelFile) ||
-      ((selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && aiPrompt)) &&
-    selectedMetric &&
-    (assessmentSkipped || assessmentResults);
+  // Next button logic
+  const canProceed = assessmentOrSkipDone;
 
   return (
     <Box>
@@ -556,142 +608,180 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         </Card>
 
         {/* Outcome Type */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              3. Outcome Type
-            </Typography>
-            <FormControl fullWidth>
-              <InputLabel>Outcome Variable Type</InputLabel>
-              <Select
-                value={outcomeType || ''}
-                onChange={(e) => setOutcomeType(e.target.value as 'binary' | 'continuous')}
-                label="Outcome Variable Type"
-                disabled={!selectedLLM}
-              >
-                <MenuItem value="binary">Binary (Classification)</MenuItem>
-                <MenuItem value="continuous">Continuous (Regression)</MenuItem>
-              </Select>
-            </FormControl>
-          </CardContent>
-        </Card>
-
-        {/* Performance Metric */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              4. Performance Metric
-            </Typography>
-            <FormControl fullWidth>
-              <InputLabel>Performance Metric</InputLabel>
-              <Select
-                value={selectedMetric?.id || ''}
-                onChange={(e) => handleMetricChange(e.target.value)}
-                label="Performance Metric"
-                disabled={!outcomeType}
-              >
-                {performanceMetrics
-                  .filter(metric => metric.applicableTypes.includes(outcomeType!))
-                  .map((metric) => (
-                    <MenuItem key={metric.id} value={metric.id}>
-                      <Box>
-                        <Typography variant="body1">{metric.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {metric.description}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-          </CardContent>
-        </Card>
-
-        {/* Performance Assessment */}
-        {selectedLLM && selectedMetric && (
-          <Card sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+        {hasTrueGrade ? (
+          <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                5. Initial Performance Assessment
+                3. Outcome Type
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Button
-                  variant="contained"
-                  onClick={handleAssessPerformance}
-                  disabled={isAssessing}
-                  startIcon={isAssessing ? <CircularProgress size={20} /> : <PlayArrow />}
+              <FormControl fullWidth error={!!outcomeTypeError}>
+                <InputLabel>Outcome Variable Type</InputLabel>
+                <Select
+                  value={outcomeType || ''}
+                  onChange={(e) => {
+                    setOutcomeType(e.target.value as 'binary' | 'continuous');
+                    setOutcomeTypeError(null);
+                  }}
+                  label="Outcome Variable Type"
+                  disabled={!selectedLLM}
                 >
-                  {isAssessing ? 'Assessing...' : 'Assess Performance'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  onClick={handleSkipAssessment}
-                  disabled={isAssessing}
-                  startIcon={<SkipNext />}
-                  sx={{ ml: 2 }}
-                >
-                  Skip Assessment
-                </Button>
-                {initialPerformance !== null && (
-                  <Typography variant="body1">
-                    Performance: {(initialPerformance * 100).toFixed(1)}%
-                  </Typography>
+                  <MenuItem value="binary">Binary (Classification)</MenuItem>
+                  <MenuItem value="continuous">Continuous (Regression)</MenuItem>
+                </Select>
+                {outcomeTypeError && (
+                  <Typography variant="caption" color="error">{outcomeTypeError}</Typography>
                 )}
-              </Box>
-              {promptError && (
-                <Alert severity="error" sx={{ mb: 2 }}>{promptError}</Alert>
-              )}
-              {assessmentError && (
-                <Alert severity="error" sx={{ mb: 2 }}>{assessmentError}</Alert>
-              )}
-              {assessmentSkipped && (
-                <Alert severity="warning" sx={{ mb: 2 }}>
-                  You skipped performance assessment. Bias model might not be accurate if model performance is low.
-                </Alert>
-              )}
-              {assessmentResults && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Sampled Grading Results:
-                  </Typography>
-                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Text</th>
-                          <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Predicted Grade</th>
-                          {assessmentResults.some(r => r.true_grade !== undefined && r.true_grade !== null) && (
-                            <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>True Grade</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {assessmentResults.map((row, idx) => (
-                          <tr key={idx}>
-                            <td style={{ verticalAlign: 'top', padding: '4px 8px', maxWidth: 300, wordBreak: 'break-word' }}>{row.text}</td>
-                            <td style={{ verticalAlign: 'top', padding: '4px 8px' }}>{row.predicted_grade}</td>
-                            {assessmentResults.some(r => r.true_grade !== undefined && r.true_grade !== null) && (
-                              <td style={{ verticalAlign: 'top', padding: '4px 8px' }}>{row.true_grade ?? ''}</td>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Paper>
-                  {assessmentMetric && assessmentMetricValue !== null && (
-                    <Alert severity={assessmentMetricValue >= 0.7 ? 'success' : 'warning'} sx={{ mt: 2 }}>
-                      {assessmentMetric.charAt(0).toUpperCase() + assessmentMetric.slice(1)}: {(assessmentMetricValue * 100).toFixed(1)}%<br />
-                      {assessmentMetricValue >= 0.7
-                        ? 'Performance is satisfactory. You can proceed with the audit.'
-                        : 'Performance is below threshold. Consider improving your model before auditing.'}
-                    </Alert>
-                  )}
-                </Box>
-              )}
+              </FormControl>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                3. Outcome Type
+              </Typography>
+              <Alert severity="info">
+                Outcome type selection is only available when your CSV includes a <strong>true_grade</strong> column.
+              </Alert>
             </CardContent>
           </Card>
         )}
+        {/* Performance Metric */}
+        {hasTrueGrade ? (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                4. Performance Metric
+              </Typography>
+              <FormControl fullWidth error={!!metricError}>
+                <InputLabel>Performance Metric</InputLabel>
+                <Select
+                  value={selectedMetric?.id || ''}
+                  onChange={(e) => {
+                    handleMetricChange(e.target.value);
+                    setMetricError(null);
+                  }}
+                  label="Performance Metric"
+                  disabled={!outcomeType}
+                >
+                  {performanceMetrics
+                    .filter(metric => metric.applicableTypes.includes(outcomeType!))
+                    .map((metric) => (
+                      <MenuItem key={metric.id} value={metric.id}>
+                        <Box>
+                          <Typography variant="body1">{metric.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {metric.description}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                </Select>
+                {metricError && (
+                  <Typography variant="caption" color="error">{metricError}</Typography>
+                )}
+              </FormControl>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                4. Performance Metric
+              </Typography>
+              <Alert severity="info">
+                Performance metrics are only available when your CSV includes a <strong>true_grade</strong> column.
+              </Alert>
+            </CardContent>
+          </Card>
+        )}
+        {/* Performance Assessment */}
+        <Card sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              5. Initial Performance Assessment
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <Button
+                variant="contained"
+                onClick={handleAssessPerformance}
+                disabled={isAssessing}
+                startIcon={isAssessing ? <CircularProgress size={20} /> : <PlayArrow />}
+              >
+                {isAssessing ? 'Assessing...' : 'Assess Performance'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={handleSkipAssessment}
+                disabled={isAssessing}
+                startIcon={<SkipNext />}
+                sx={{ ml: 2 }}
+              >
+                Skip Assessment
+              </Button>
+              {hasTrueGrade && assessmentMetric && assessmentMetricValue !== null && (
+                <Typography variant="body1" sx={{ ml: 2 }}>
+                  {assessmentMetric}: {assessmentMetricValue.toFixed(3)}
+                </Typography>
+              )}
+            </Box>
+            {fileError && (
+              <Alert severity="error" sx={{ mb: 2 }}>{fileError}</Alert>
+            )}
+            {llmError && (
+              <Alert severity="error" sx={{ mb: 2 }}>{llmError}</Alert>
+            )}
+            {promptError && (
+              <Alert severity="error" sx={{ mb: 2 }}>{promptError}</Alert>
+            )}
+            {assessmentError && (
+              <Alert severity="error" sx={{ mb: 2 }}>{assessmentError}</Alert>
+            )}
+            {assessmentSkipped && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                You skipped performance assessment. Bias model might not be accurate if model performance is low.
+              </Alert>
+            )}
+            {assessmentResults && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Sampled Grading Results:
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Text</th>
+                        <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Predicted Grade</th>
+                        {hasTrueGrade && assessmentResults.some(r => r.true_grade !== undefined && r.true_grade !== null) && (
+                          <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>True Grade</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assessmentResults.map((row, idx) => (
+                        <tr key={idx}>
+                          <td style={{ verticalAlign: 'top', padding: '4px 8px', maxWidth: 300, wordBreak: 'break-word' }}>{row.text}</td>
+                          <td style={{ verticalAlign: 'top', padding: '4px 8px' }}>{row.predicted_grade}</td>
+                          {hasTrueGrade && assessmentResults.some(r => r.true_grade !== undefined && r.true_grade !== null) && (
+                            <td style={{ verticalAlign: 'top', padding: '4px 8px' }}>{row.true_grade ?? ''}</td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Paper>
+                {/* Removed alert for metric threshold logic as per instructions */}
+                {!hasTrueGrade && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Performance metrics are only calculated when your CSV includes a <strong>true_grade</strong> column.
+                  </Alert>
+                )}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
       </Box>
 
       {/* Navigation */}

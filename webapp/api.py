@@ -510,6 +510,21 @@ def assess_performance():
                 ss_tot = sum((a - mean_true) ** 2 for a in y_true)
                 ss_res = sum((a - b) ** 2 for a, b in zip(y_true, y_pred))
                 metric_value = 1 - ss_res / ss_tot if ss_tot != 0 else None
+            elif metric in ('precision', 'recall', 'f1'):
+                # Convert to binary 0/1
+                y_true_bin = [1 if float(x) >= 0.5 else 0 for x in y_true]
+                y_pred_bin = [1 if float(x) >= 0.5 else 0 for x in y_pred]
+                tp = sum(1 for yt, yp in zip(y_true_bin, y_pred_bin) if yt == 1 and yp == 1)
+                fp = sum(1 for yt, yp in zip(y_true_bin, y_pred_bin) if yt == 0 and yp == 1)
+                fn = sum(1 for yt, yp in zip(y_true_bin, y_pred_bin) if yt == 1 and yp == 0)
+                if metric == 'precision':
+                    metric_value = tp / (tp + fp) if (tp + fp) > 0 else None
+                elif metric == 'recall':
+                    metric_value = tp / (tp + fn) if (tp + fn) > 0 else None
+                elif metric == 'f1':
+                    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+                    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+                    metric_value = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else None
         except Exception:
             metric_value = None
 
