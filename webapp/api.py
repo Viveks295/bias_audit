@@ -655,5 +655,45 @@ def preview_audit():
         "moments_table": moments_df.to_dict(orient="records")
     })
 
+@api.route('/api/create_session', methods=['POST'])
+def create_session():
+    """Create a session for uploaded CSV and model info, without running assessment."""
+    csv_file = request.files.get('csv_file')
+    model_type = request.form.get('model_type')
+    ai_prompt = request.form.get('ai_prompt')
+    rubric = request.form.get('rubric')
+    custom_model_file = request.files.get('custom_model_file')
+
+    if not csv_file or not model_type:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    # Read CSV
+    df = pd.read_csv(csv_file)
+    if 'text' not in df.columns:
+        return jsonify({'error': 'CSV must contain a "text" column'}), 400
+
+    # Store the full CSV and model info for later use
+    session_id = f"csv_{len(csv_storage) + 1}"
+
+    # Store model info and data
+    session_data = {
+        'data': df,
+        'model_type': model_type,
+        'ai_prompt': ai_prompt or '',
+        'rubric': rubric or '',
+        'custom_model_path': None
+    }
+
+    # Handle custom model file storage
+    if model_type == 'custom' and custom_model_file:
+        temp_dir = tempfile.mkdtemp(prefix="custom_model_")
+        model_path = os.path.join(temp_dir, custom_model_file.filename)
+        custom_model_file.save(model_path)
+        session_data['custom_model_path'] = model_path
+
+    csv_storage[session_id] = session_data
+
+    return jsonify({'session_id': session_id})
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000) 

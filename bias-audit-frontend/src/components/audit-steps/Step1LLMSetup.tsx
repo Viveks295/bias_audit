@@ -239,13 +239,12 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     }
   };
 
-  const handleSkipAssessment = () => {
+  const handleSkipAssessment = async () => {
     // Check if AI prompt is required and filled
     if ((selectedLLM?.id === 'gpt-4.1' || selectedLLM?.id === 'gpt-4o') && !aiPrompt.trim()) {
       setPromptError('Model AI prompt is required before skipping assessment');
       return;
     }
-    
     setPromptError(null);
     setAssessmentSkipped(true);
     setInitialPerformance(null);
@@ -253,6 +252,21 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     setAssessmentResults(null);
     setAssessmentMetric(null);
     setAssessmentMetricValue(null);
+    // Create a session for later steps
+    if (uploadedFile && selectedLLM && outcomeType && selectedMetric) {
+      try {
+        const resp = await auditAPI.createSession({
+          csvFile: uploadedFile,
+          modelType: selectedLLM.id,
+          aiPrompt: selectedLLM.id !== 'custom' ? aiPrompt : undefined,
+          rubric: selectedLLM.id !== 'custom' ? rubric : undefined,
+          customModelFile: selectedLLM.id === 'custom' ? customModelFile || undefined : undefined,
+        });
+        setSessionId(resp.session_id);
+      } catch (err: any) {
+        setPromptError(err?.response?.data?.error || err.message || 'Error creating session');
+      }
+    }
   };
 
   const handleNext = () => {

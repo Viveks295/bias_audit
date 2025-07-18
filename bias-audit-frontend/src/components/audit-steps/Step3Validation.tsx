@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
   Box,
@@ -73,6 +73,14 @@ const Step3Validation: React.FC<Step3ValidationProps> = ({
     }
   };
 
+  // Automatically sample variations on mount if not already sampled
+  useEffect(() => {
+    if (!sampledVariations && !isSampling && auditState.sessionId && auditState.selectedVariations.length) {
+      handleSampleVariations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleNext = () => {
     onComplete({ 
       variationsValid,
@@ -81,7 +89,7 @@ const Step3Validation: React.FC<Step3ValidationProps> = ({
     onNext();
   };
 
-  const canProceed = variationsValid !== null;
+  const canProceed = variationsValid === true;
 
   return (
     <Box>
@@ -102,14 +110,8 @@ const Step3Validation: React.FC<Step3ValidationProps> = ({
           </Typography>
           
           <Box sx={{ mb: 3 }}>
-            <Button
-              variant="outlined"
-              onClick={handleSampleVariations}
-              disabled={isSampling || !auditState.sessionId || !auditState.selectedVariations.length}
-              startIcon={isSampling ? <CircularProgress size={20} /> : null}
-            >
-              {isSampling ? 'Sampling...' : 'Sample Variations'}
-            </Button>
+            {/* Button removed: sampling now happens automatically on mount */}
+            {isSampling && <CircularProgress size={20} />}
           </Box>
 
           {samplingError && (
