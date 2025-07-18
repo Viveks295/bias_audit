@@ -2,7 +2,6 @@ export interface LLMModel {
   id: string;
   name: string;
   description: string;
-  type: 'binary' | 'continuous' | 'custom';
 }
 
 export interface PerformanceMetric {

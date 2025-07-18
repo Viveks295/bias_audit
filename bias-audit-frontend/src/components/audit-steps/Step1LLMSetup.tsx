@@ -13,8 +13,11 @@ import {
   CircularProgress,
   Paper,
   TextField,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
-import { CloudUpload } from '@mui/icons-material';
+import { CloudUpload, CheckCircle, ExpandMore, PlayArrow, SkipNext } from '@mui/icons-material';
 import { AuditState, LLMModel, PerformanceMetric } from '../../types';
 import { auditAPI } from '../../services/api';
 import Papa from 'papaparse';
@@ -29,20 +32,17 @@ const availableLLMs: LLMModel[] = [
   {
     id: 'gpt-4.1',
     name: 'GPT-4.1',
-    description: 'OpenAI GPT-4.1 model for text generation and analysis',
-    type: 'continuous',
+    description: 'OpenAI GPT-4.1 model for text analysis',
   },
   {
     id: 'gpt-4o',
     name: 'GPT-4o',
-    description: 'OpenAI GPT-4o model for text generation and analysis',
-    type: 'continuous',
+    description: 'OpenAI GPT-4o model for text analysis',
   },
   {
     id: 'custom',
     name: 'Custom Model',
-    description: 'Upload your own Python model for custom tasks',
-    type: 'custom',
+    description: 'Upload your own Python model for custom grading',
   },
 ];
 
@@ -118,6 +118,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const [assessmentSkipped, setAssessmentSkipped] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string | null>(auditState.sessionId || null);
+  const [promptError, setPromptError] = useState<string | null>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -138,10 +139,24 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
       // Use PapaParse to parse CSV robustly
       const parsed = Papa.parse(content, { header: false });
       if (parsed.data && parsed.data.length > 0) {
-        setCsvHeaders(parsed.data[0] as string[]);
+        const headers = parsed.data[0] as string[];
+        setCsvHeaders(headers);
         setCsvData((parsed.data as string[][]).slice(1, 6)); // first 5 rows
+        
+        // Check if text column exists
+        const hasTextColumn = headers.some(header => 
+          header.toLowerCase() === 'text'
+        );
+        
+        if (!hasTextColumn) {
+          setUploadError('CSV file must contain a column named "text"');
+          setUploadedFile(null);
+          setCsvHeaders([]);
+          setCsvData([]);
+        } else {
+          setUploadedFile(file);
+        }
       }
-      setUploadedFile(file);
       setIsUploading(false);
     };
     reader.onerror = () => {
@@ -160,6 +175,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
     setCustomModelError(null);
     setAiPrompt("");
     setRubric("");
+    setPromptError(null);
   };
 
   const handleCustomModelUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,6 +197,14 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
 
   const handleAssessPerformance = async () => {
     if (!selectedLLM || !selectedMetric || !uploadedFile) return;
+    
+    // Check if AI prompt is required and filled
+    if ((selectedLLM.id === 'gpt-4.1' || selectedLLM.id === 'gpt-4o') && !aiPrompt.trim()) {
+      setPromptError('Model AI prompt is required before assessing performance');
+      return;
+    }
+    
+    setPromptError(null);
     setIsAssessing(true);
     setAssessmentError(null);
     setAssessmentResults(null);
@@ -216,6 +240,13 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
   };
 
   const handleSkipAssessment = () => {
+    // Check if AI prompt is required and filled
+    if ((selectedLLM?.id === 'gpt-4.1' || selectedLLM?.id === 'gpt-4o') && !aiPrompt.trim()) {
+      setPromptError('Model AI prompt is required before skipping assessment');
+      return;
+    }
+    
+    setPromptError(null);
     setAssessmentSkipped(true);
     setInitialPerformance(null);
     setPerformanceSatisfactory(null);
@@ -297,12 +328,13 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                 p: 3,
                 textAlign: 'center',
                 border: '2px dashed',
-                borderColor: 'grey.300',
-                backgroundColor: 'grey.50',
+                borderColor: uploadedFile ? 'success.main' : 'grey.300',
+                backgroundColor: uploadedFile ? 'success.50' : 'grey.50',
                 cursor: 'pointer',
+                transition: 'all 0.2s',
                 '&:hover': {
-                  borderColor: 'primary.main',
-                  backgroundColor: 'grey.100',
+                  borderColor: uploadedFile ? 'success.main' : 'primary.main',
+                  backgroundColor: uploadedFile ? 'success.50' : 'grey.100',
                 },
               }}
               onClick={() => document.getElementById('csv-upload')?.click()}
@@ -314,11 +346,15 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                 onChange={handleFileUpload}
                 style={{ display: 'none' }}
               />
-              <CloudUpload sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
-              <Typography variant="h6" gutterBottom>
+              {uploadedFile ? (
+                <CheckCircle sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
+              ) : (
+                <CloudUpload sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+              )}
+              <Typography variant="h6" gutterBottom color={uploadedFile ? 'success.main' : 'inherit'}>
                 {uploadedFile ? uploadedFile.name : 'Click to upload CSV file'}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color={uploadedFile ? 'success.main' : 'text.secondary'}>
                 {uploadedFile ? 'File uploaded successfully' : 'Drag and drop or click to browse'}
               </Typography>
               {isUploading && (
@@ -336,22 +372,25 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
             )}
 
             {csvHeaders.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  File Preview (First 5 rows):
-                </Typography>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    backgroundColor: 'grey.50',
-                    maxHeight: 300,
-                    overflow: 'auto',
-                  }}
-                >
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f5f5f5' }}>
+              <Accordion sx={{ mt: 2 }}>
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Typography variant="subtitle2">
+                    File Preview (First 5 rows)
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      backgroundColor: 'grey.50',
+                      maxHeight: 300,
+                      overflow: 'auto',
+                    }}
+                  >
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f5f5f5' }}>
                         {csvHeaders.map((header, index) => (
                           <th
                             key={index}
@@ -388,13 +427,14 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                     </tbody>
                   </table>
                 </Paper>
-              </Box>
+              </AccordionDetails>
+            </Accordion>
             )}
           </CardContent>
         </Card>
 
         {/* LLM Selection */}
-        <Card>
+        <Card sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               2. Choose Your Model
@@ -423,26 +463,46 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
             {/* Conditional UI for Custom Model or GPT models */}
             {selectedLLM?.id === 'custom' && (
               <Box sx={{ mt: 2 }}>
-                <Button
+                <Paper
                   variant="outlined"
-                  component="label"
-                  fullWidth
+                  sx={{
+                    p: 3,
+                    textAlign: 'center',
+                    border: '2px dashed',
+                    borderColor: customModelFile ? 'success.main' : 'grey.300',
+                    backgroundColor: customModelFile ? 'success.50' : 'grey.50',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      borderColor: customModelFile ? 'success.main' : 'primary.main',
+                      backgroundColor: customModelFile ? 'success.50' : 'grey.100',
+                    },
+                  }}
+                  onClick={() => document.getElementById('python-upload')?.click()}
                 >
-                  Upload Python Model (.py)
                   <input
+                    id="python-upload"
                     type="file"
                     accept=".py"
                     hidden
                     onChange={handleCustomModelUpload}
                   />
-                </Button>
-                {customModelFile && (
-                  <Typography variant="body2" sx={{ mt: 1 }}>
-                    Uploaded: {customModelFile.name}
+                  {customModelFile ? (
+                    <CheckCircle sx={{ fontSize: 48, color: 'success.main', mb: 1 }} />
+                  ) : (
+                    <CloudUpload sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+                  )}
+                  <Typography variant="h6" gutterBottom color={customModelFile ? 'success.main' : 'inherit'}>
+                    {customModelFile ? customModelFile.name : 'Click to upload Python model (.py)'}
                   </Typography>
-                )}
+                  <Typography variant="body2" color={customModelFile ? 'success.main' : 'text.secondary'}>
+                    {customModelFile ? 'Python model uploaded successfully' : 'Drag and drop or click to browse'}
+                  </Typography>
+                </Paper>
                 {customModelError && (
-                  <Alert severity="error" sx={{ mt: 1 }}>{customModelError}</Alert>
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {customModelError}
+                  </Alert>
                 )}
               </Box>
             )}
@@ -451,12 +511,20 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                 <TextField
                   label="Model AI Prompt"
                   value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
+                  onChange={e => {
+                    setAiPrompt(e.target.value);
+                    if (e.target.value.trim()) {
+                      setPromptError(null);
+                    }
+                  }}
                   placeholder="Enter the prompt you will use for the AI model"
                   fullWidth
                   multiline
                   minRows={3}
                   variant="outlined"
+                  error={!!promptError}
+                  helperText={promptError}
+                  required
                 />
                 <TextField
                   label="Rubric (Optional)"
@@ -495,7 +563,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         </Card>
 
         {/* Performance Metric */}
-        <Card sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+        <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               4. Performance Metric
@@ -537,7 +605,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                   variant="contained"
                   onClick={handleAssessPerformance}
                   disabled={isAssessing}
-                  startIcon={isAssessing ? <CircularProgress size={20} /> : null}
+                  startIcon={isAssessing ? <CircularProgress size={20} /> : <PlayArrow />}
                 >
                   {isAssessing ? 'Assessing...' : 'Assess Performance'}
                 </Button>
@@ -546,6 +614,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                   color="warning"
                   onClick={handleSkipAssessment}
                   disabled={isAssessing}
+                  startIcon={<SkipNext />}
                   sx={{ ml: 2 }}
                 >
                   Skip Assessment
@@ -556,6 +625,9 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                   </Typography>
                 )}
               </Box>
+              {promptError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{promptError}</Alert>
+              )}
               {assessmentError && (
                 <Alert severity="error" sx={{ mb: 2 }}>{assessmentError}</Alert>
               )}
