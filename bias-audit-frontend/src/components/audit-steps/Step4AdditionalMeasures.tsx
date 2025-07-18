@@ -89,28 +89,7 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
     // eslint-disable-next-line
   }, [sessionId, selectedVariation, JSON.stringify(sampleTexts)]);
 
-  // Handler for Update Preview button
-  const handleUpdatePreview = () => {
-    if (!sessionId || !selectedVariation || sampleTexts.length !== 5) return;
-    setPreviewLoading(true);
-    setPreviewError(null);
-    auditAPI.previewAudit({
-      sessionId,
-      sampleTexts,
-      variation: selectedVariation,
-      magnitude: defaultMagnitude,
-    })
-      .then((data) => {
-        setBiasTable(data.bias_table);
-        setMomentsTable(data.moments_table);
-      })
-      .catch((err) => {
-        setPreviewError(err?.response?.data?.error || err.message || 'Error fetching preview');
-        setBiasTable(null);
-        setMomentsTable(null);
-      })
-      .finally(() => setPreviewLoading(false));
-  };
+
 
   // Remove the unnecessary useEffect that was making API calls when selectedMoments changes
   // The moments table will update instantly by filtering the existing data
@@ -199,14 +178,6 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
             <Typography variant="h6" gutterBottom>
               Preview Audit Results (Variation: {selectedVariation}, Magnitude: {defaultMagnitude})
             </Typography>
-            <Button
-              variant="outlined"
-              onClick={handleUpdatePreview}
-              disabled={previewLoading}
-              sx={{ mb: 2 }}
-            >
-              {previewLoading ? 'Loading…' : 'Update Preview'}
-            </Button>
             {previewError && (
               <Typography color="error" sx={{ mb: 2 }}>{previewError}</Typography>
             )}
