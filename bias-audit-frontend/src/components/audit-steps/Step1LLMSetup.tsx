@@ -387,6 +387,9 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
                 <strong>demographic_group</strong> (optional): Demographic information for bias analysis
               </Typography>
             </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              Note: The column containing demographic group information does not need to be named "demographic_group". You will be able to select the appropriate column in a later step.
+            </Typography>
             
             <Paper
               variant="outlined"

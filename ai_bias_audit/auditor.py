@@ -121,7 +121,8 @@ class Auditor:
         # Prepare group values if needed
         group_vals = None
         if group_col is not None and group_col in filtered_data.columns:
-            group_vals = filtered_data[group_col].fillna('unknown').tolist()
+            # Normalize group values: strip whitespace and convert to string
+            group_vals = filtered_data[group_col].fillna('unknown').apply(lambda x: str(x).strip()).tolist()
         elif group_col is not None:
             group_vals = ['unknown'] * len(filtered_data)
 
@@ -224,6 +225,7 @@ class Auditor:
     def audit_moments(self, group_col: str = None) -> pd.DataFrame:
         """
         Return a DataFrame with mean, variance, and skewness for each bias measure, grouped by variation, magnitude, and group (if provided).
+        Ensures that the output always includes rows for 'all' (aggregate), as well as for each unique group value present in the data.
         Args:
             group_col: Optional str. Name of the column to use for group/demographic analysis.
         Returns:
@@ -242,31 +244,62 @@ class Auditor:
         group_cols = ['variation', 'magnitude']
         if group_col is not None and 'group' in self.results.columns:
             group_cols.append('group')
+            # Get all unique group values from the results
+            unique_groups = sorted(self.results['group'].dropna().unique().tolist())
+        else:
+            unique_groups = []
         
-        grouped = self.results.groupby(group_cols)
-        for group_keys, group in grouped:
-            if isinstance(group_keys, tuple):
-                row = dict(zip(group_cols, group_keys))
-            else:
-                row = {group_cols[0]: group_keys}
-            
-            for col in bias_cols:
-                vals = group[col].dropna()
-                if len(vals) == 0:
-                    # If no valid values, use NaN
-                    row[f'{col}_mean'] = float('nan')
-                    row[f'{col}_var'] = float('nan')
-                    row[f'{col}_skew'] = float('nan')
-                else:
-                    row[f'{col}_mean'] = vals.mean()
-                    row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
-                    try:
-                        row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
-                    except Exception as e:
-                        print(f"Warning: Could not calculate skewness for {col}: {str(e)}. Using 0.0.")
-                        row[f'{col}_skew'] = 0.0
-            
-            moments.append(row)
+        # Always include 'all' as a group for aggregate
+        if group_col is not None:
+            all_group_values = ['all'] + unique_groups
+        else:
+            all_group_values = [None]
+        
+        # Get all unique variations and magnitudes
+        unique_variations = sorted(self.results['variation'].unique().tolist())
+        unique_magnitudes = sorted(self.results['magnitude'].unique().tolist())
+        
+        # For each combination, compute moments (or fill with NaN if missing)
+        for variation in unique_variations:
+            for magnitude in unique_magnitudes:
+                # Aggregate over all groups
+                if group_col is not None:
+                    df_all = self.results[(self.results['variation'] == variation) & (self.results['magnitude'] == magnitude)]
+                    row = {'variation': variation, 'magnitude': magnitude, 'group': 'all'}
+                    for col in bias_cols:
+                        vals = df_all[col].dropna()
+                        if len(vals) == 0:
+                            row[f'{col}_mean'] = float('nan')
+                            row[f'{col}_var'] = float('nan')
+                            row[f'{col}_skew'] = float('nan')
+                        else:
+                            row[f'{col}_mean'] = vals.mean()
+                            row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
+                            try:
+                                row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
+                            except Exception as e:
+                                print(f"Warning: Could not calculate skewness for {col}: {str(e)}. Using 0.0.")
+                                row[f'{col}_skew'] = 0.0
+                    moments.append(row)
+                # Per-group
+                for group in unique_groups:
+                    df_group = self.results[(self.results['variation'] == variation) & (self.results['magnitude'] == magnitude) & (self.results['group'] == group)]
+                    row = {'variation': variation, 'magnitude': magnitude, 'group': group}
+                    for col in bias_cols:
+                        vals = df_group[col].dropna()
+                        if len(vals) == 0:
+                            row[f'{col}_mean'] = float('nan')
+                            row[f'{col}_var'] = float('nan')
+                            row[f'{col}_skew'] = float('nan')
+                        else:
+                            row[f'{col}_mean'] = vals.mean()
+                            row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
+                            try:
+                                row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
+                            except Exception as e:
+                                print(f"Warning: Could not calculate skewness for {col}: {str(e)}. Using 0.0.")
+                                row[f'{col}_skew'] = 0.0
+                    moments.append(row)
         
         moments_df = pd.DataFrame(moments)
         
@@ -274,5 +307,5 @@ class Auditor:
         numeric_columns = [col for col in moments_df.columns if any(bias_measure in col for bias_measure in ['bias_0', 'bias_1', 'bias_2', 'bias_3'])]
         for col in numeric_columns:
             moments_df[col] = moments_df[col].round(3)
-            
+        
         return moments_df
