@@ -237,18 +237,18 @@ def start_audit():
         
         # Calculate moments during the initial audit
         moments = []
-        if model_type != 'custom':  # Moments not supported for custom models
-            try:
-                print(f"Calculating moments for session {session_id} with group_col: {group_col}")
-                moments_df = auditor.audit_moments(group_col=group_col)
-                moments = moments_df.to_dict(orient="records")
-                print(f"Successfully calculated {len(moments)} moments")
-            except Exception as e:
-                print(f"Moments calculation error during audit: {str(e)}")
-                traceback.print_exc()
-                moments = []
-        else:
-            print(f"Skipping moments calculation for custom model in session {session_id}")
+        try:
+            print(f"Calculating moments for session {session_id} with group_col: {group_col}")
+            moments_df = auditor.audit_moments(group_col=group_col)
+            moments = moments_df.to_dict(orient="records")
+            print(f"Successfully calculated {len(moments)} moments")
+        except Exception as e:
+            print(f"Moments calculation error during audit: {str(e)}")
+            traceback.print_exc()
+            moments = []
+            # For custom models, provide a more specific error message
+            if model_type == 'custom':
+                print(f"Custom model moments calculation failed: {str(e)}")
         
         # Convert results to the expected format
         results = []

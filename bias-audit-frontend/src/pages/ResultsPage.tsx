@@ -492,10 +492,13 @@ const ResultsPage: React.FC = () => {
                 No moments data available. This may be because:
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                • The audit was run with a custom model (moments not supported)
+                • The moments calculation failed during the audit
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 • No audit results are available
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                • The model outputs were not compatible with statistical analysis
               </Typography>
             </Box>
           )}

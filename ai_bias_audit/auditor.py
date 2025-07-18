@@ -36,7 +36,23 @@ class Auditor:
             DataFrame with an added 'predicted_grade' column.
         """
         df = self.data if texts is None else texts.copy()
-        preds = [self.model(row['text']) for _, row in df.iterrows()]
+        preds = []
+        for _, row in df.iterrows():
+            try:
+                pred = self.model(row['text'])
+                # Ensure the prediction is numeric
+                if isinstance(pred, (int, float)):
+                    preds.append(float(pred))
+                else:
+                    # Try to convert to float, if it fails, use NaN
+                    try:
+                        preds.append(float(pred))
+                    except (ValueError, TypeError):
+                        print(f"Warning: Model returned non-numeric value '{pred}' for text. Using NaN.")
+                        preds.append(float('nan'))
+            except Exception as e:
+                print(f"Warning: Model failed to grade text: {str(e)}. Using NaN.")
+                preds.append(float('nan'))
         df['predicted_grade'] = preds
         return df
 
@@ -215,23 +231,43 @@ class Auditor:
         """
         if self.results is None or self.results.empty:
             raise ValueError("No audit results available. Run audit() first.")
+        
+        # Check if required bias columns exist
+        bias_cols = ['bias_0', 'bias_1', 'bias_2', 'bias_3']
+        missing_cols = [col for col in bias_cols if col not in self.results.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required bias columns: {missing_cols}. Run audit() first.")
+        
         moments = []
         group_cols = ['variation', 'magnitude']
         if group_col is not None and 'group' in self.results.columns:
             group_cols.append('group')
-        bias_cols = ['bias_0', 'bias_1', 'bias_2', 'bias_3']
+        
         grouped = self.results.groupby(group_cols)
         for group_keys, group in grouped:
             if isinstance(group_keys, tuple):
                 row = dict(zip(group_cols, group_keys))
             else:
                 row = {group_cols[0]: group_keys}
+            
             for col in bias_cols:
                 vals = group[col].dropna()
-                row[f'{col}_mean'] = vals.mean()
-                row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
-                row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
+                if len(vals) == 0:
+                    # If no valid values, use NaN
+                    row[f'{col}_mean'] = float('nan')
+                    row[f'{col}_var'] = float('nan')
+                    row[f'{col}_skew'] = float('nan')
+                else:
+                    row[f'{col}_mean'] = vals.mean()
+                    row[f'{col}_var'] = vals.var(ddof=1) if len(vals) > 1 else 0.0
+                    try:
+                        row[f'{col}_skew'] = skew(vals, bias=False) if len(vals) > 2 else 0.0
+                    except Exception as e:
+                        print(f"Warning: Could not calculate skewness for {col}: {str(e)}. Using 0.0.")
+                        row[f'{col}_skew'] = 0.0
+            
             moments.append(row)
+        
         moments_df = pd.DataFrame(moments)
         
         # Round numeric columns to 3 decimal places
