@@ -230,10 +230,18 @@ def start_audit():
         # Debug logging
         print(f"Selected variations: {variations}")
         print(f"Selected magnitudes: {magnitudes}")
+        print(f"Score cutoff: {score_cutoff}")
         
         # Create auditor and run audit
         auditor = Auditor(model=grade_fn, data=df)
         bias_df = auditor.audit(variations, magnitudes, score_cutoff=score_cutoff, group_col=group_col)
+        
+        # Debug: Print audit results shape and head
+        print(f"Audit results shape: {auditor.results.shape if hasattr(auditor, 'results') else 'No results attribute'}")
+        if hasattr(auditor, 'results'):
+            print(auditor.results.head())
+        else:
+            print("No results DataFrame present in auditor.")
         
         # Calculate moments during the initial audit
         moments = []

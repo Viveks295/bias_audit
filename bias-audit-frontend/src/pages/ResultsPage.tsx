@@ -238,8 +238,8 @@ const ResultsPage: React.FC = () => {
       return;
     }
 
-    // Create CSV content for moments data
-    const headers = Object.keys(moments[0]);
+    // Use the filtered columns (momentsTableCols) for CSV
+    const headers = momentsTableCols;
     const csvContent = "data:text/csv;charset=utf-8," + 
       headers.join(",") + "\n" +
       moments.map((row: any) => 
@@ -267,6 +267,35 @@ const ResultsPage: React.FC = () => {
     variationBias0Means[variation] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   });
   const mostSensitiveVariation = Object.entries(variationBias0Means).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+
+  // --- BEGIN: Filter moments table columns based on Step 4 selections ---
+  // Get selected measures and moments from auditState (Step 4)
+  const selectedMeasures = auditState?.selectedMeasures || [];
+  const selectedMoments = auditState?.selectedMoments || [];
+  const useAdditionalMeasures = auditState?.useAdditionalMeasures;
+  const useHigherMoments = auditState?.useHigherMoments;
+
+  // Always include bias_0
+  const selectedBiasesForMoments = ['bias_0', ...(useAdditionalMeasures ? selectedMeasures : [])];
+  // Always include mean
+  const momentSet = new Set(['mean', ...(useHigherMoments ? selectedMoments : [])]);
+  const momentCols = Array.from(momentSet);
+  // Map frontend moment names to backend column suffixes
+  const momentToSuffix: Record<string, string> = {
+    'mean': 'mean',
+    'variance': 'var',
+    'skewness': 'skew',
+  };
+  // Only show group/variation/magnitude and selected bias-moment columns
+  const momentsTableCols = moments.length > 0
+    ? [
+        ...['variation', 'magnitude', 'group'].filter(col => col in moments[0]),
+        ...selectedBiasesForMoments.flatMap(bias =>
+          momentCols.map(moment => `${bias}_${momentToSuffix[moment]}`).filter(col => col in moments[0])
+        ),
+      ]
+    : [];
+  // --- END: Filter moments table columns based on Step 4 selections ---
 
   // Remove auditState check. Show 'No Audit Results Found' only if no results, not loading, and no error.
   if (!loading && !error && results.length === 0) {
@@ -464,8 +493,8 @@ const ResultsPage: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    {/* Dynamically render columns based on keys in moments[0] */}
-                    {moments[0] && Object.keys(moments[0]).map((key) => (
+                    {/* Only render selected columns */}
+                    {momentsTableCols.map((key) => (
                       <TableCell key={key}>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
                     ))}
                   </TableRow>
@@ -473,11 +502,13 @@ const ResultsPage: React.FC = () => {
                 <TableBody>
                   {moments.map((moment: any, index: number) => (
                     <TableRow key={index}>
-                      {Object.keys(moments[0]).map((key) => (
+                      {momentsTableCols.map((key) => (
                         <TableCell key={key}>
                           {/* Render as Chip for variation, else as text/number */}
                           {key === 'variation' ? (
                             <Chip label={moment[key]} size="small" />
+                          ) : key === 'magnitude' ? (
+                            parseInt(moment[key], 10)
                           ) : (typeof moment[key] === 'number' ? moment[key]?.toFixed(3) : (moment[key] ?? 'N/A'))}
                         </TableCell>
                       ))}
