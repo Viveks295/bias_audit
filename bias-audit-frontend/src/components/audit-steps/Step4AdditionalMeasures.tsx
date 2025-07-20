@@ -11,6 +11,15 @@ import {
   RadioGroup,
   Checkbox,
   FormGroup,
+  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
 } from '@mui/material';
 import { AuditState } from '../../types';
 import { auditAPI } from '../../services/api';
@@ -58,12 +67,8 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
     ? auditState.selectedVariations[0].id
     : undefined;
   const defaultMagnitude = 50;
-  const sampleTexts = sampledVariations.map((s: any) => {
-    if (selectedVariation && s.variations && s.variations[selectedVariation]) {
-      return s.variations[selectedVariation];
-    }
-    return s.original || '';
-  }).slice(0, 5);
+  // Always use the original text for preview
+  const sampleTexts = sampledVariations.map((s: any) => s.original || '').slice(0, 5);
 
   // Fetch preview on initial render
   useEffect(() => {
@@ -133,7 +138,7 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
   const canProceed = useAdditionalMeasures !== null && useHigherMoments !== null;
 
   // Determine which bias and moment columns to show
-  const coreBiasCols = ['index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'difference', 'group'];
+  const coreBiasCols = ['index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'group'];
   const biasCols = [
     'bias_0',
     ...(useAdditionalMeasures ? selectedMeasures : []),
@@ -163,9 +168,7 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
   // Only show group/variation/magnitude and selected bias-moment columns
   const momentsTableCols = momentsTable && momentsTable.length > 0
     ? [
-        ...Object.keys(momentsTable[0]).filter(col =>
-          ['variation', 'magnitude', 'group'].includes(col)
-        ),
+        ...['variation', 'magnitude'].filter(col => col in momentsTable[0]),
         ...selectedBiasesForMoments.flatMap(bias =>
           momentCols.map(moment => `${bias}_${momentToSuffix[moment]}`).filter(col => col in momentsTable[0])
         ),
@@ -188,59 +191,85 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
             <Typography variant="h6" gutterBottom>
               Preview Audit Results (Variation: {selectedVariation}, Magnitude: {defaultMagnitude})
             </Typography>
-            {previewError && (
+            {/* Loading Spinner */}
+            {previewLoading && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 2 }}>
+                <CircularProgress size={32} />
+                <Typography variant="body2" sx={{ mt: 1 }}>Loading preview...</Typography>
+              </Box>
+            )}
+            {/* Error */}
+            {!previewLoading && previewError && (
               <Typography color="error" sx={{ mb: 2 }}>{previewError}</Typography>
             )}
             {/* Bias Table */}
-            {biasTable && biasTable.length > 0 && (
+            {!previewLoading && biasTable && biasTable.length > 0 && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle1">Bias Measures Table</Typography>
-                <Box sx={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
+                <TableContainer component={Paper}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
                         {biasTableCols.map((col) => (
-                          <th key={col} style={{ borderBottom: '1px solid #ccc', padding: 4 }}>{col}</th>
+                          <TableCell key={col} sx={{ fontWeight: 'bold' }}>
+                            {col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </TableCell>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
                       {biasTable.map((row, i) => (
-                        <tr key={i}>
+                        <TableRow key={i}>
                           {biasTableCols.map((col, j) => (
-                            <td key={j} style={{ borderBottom: '1px solid #eee', padding: 4 }}>{String(row[col])}</td>
+                            <TableCell key={j}>
+                              {col === 'variation' ? (
+                                <Chip label={row[col]} size="small" />
+                              ) : col === 'magnitude' ? (
+                                parseInt(row[col], 10)
+                              ) : col === 'index' ? (
+                                parseInt(row[col], 10)
+                              ) : (typeof row[col] === 'number' ? row[col]?.toFixed(3) : (row[col] ?? 'N/A'))}
+                            </TableCell>
                           ))}
-                        </tr>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </Box>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Box>
             )}
             {/* Moments Table */}
-            {momentsTable && momentsTable.length > 0 && (
+            {!previewLoading && momentsTable && momentsTable.length > 0 && (
               <Box>
                 <Typography variant="subtitle1">Statistical Moments Table</Typography>
-                <Box sx={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
+                <TableContainer component={Paper}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
                         {momentsTableCols.map((col) => (
-                          <th key={col} style={{ borderBottom: '1px solid #ccc', padding: 4 }}>{col}</th>
+                          <TableCell key={col} sx={{ fontWeight: 'bold' }}>
+                            {col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </TableCell>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
                       {momentsTable.map((row, i) => (
-                        <tr key={i}>
+                        <TableRow key={i}>
                           {momentsTableCols.map((col, j) => (
-                            <td key={j} style={{ borderBottom: '1px solid #eee', padding: 4 }}>{String(row[col])}</td>
+                            <TableCell key={j}>
+                              {col === 'variation' ? (
+                                <Chip label={row[col]} size="small" />
+                              ) : col === 'magnitude' ? (
+                                parseInt(row[col], 10)
+                              ) : (typeof row[col] === 'number' ? row[col]?.toFixed(3) : (row[col] ?? 'N/A'))}
+                            </TableCell>
                           ))}
-                        </tr>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </Box>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </Box>
             )}
           </CardContent>

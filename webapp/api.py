@@ -7,9 +7,10 @@ import json
 import traceback
 from typing import Dict, Any, List
 import importlib.util
+import os
+from openai import OpenAI
 from ai_bias_audit.auditor import Auditor
 from ai_bias_audit.variations import get_variation
-from openai import OpenAI
 import random
 import smtplib
 from email.mime.text import MIMEText
@@ -63,6 +64,43 @@ FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@biasaudit.com')
 api = Blueprint('api', __name__)
 CORS(api)  # Enable CORS specifically for the API Blueprint
 
+def build_gpt_prompt(ai_prompt, rubric, text):
+    prompt = f"{ai_prompt}\n"
+    if rubric and rubric.strip():
+        prompt += f"Rubric: {rubric}\n"
+    prompt += f"Respond with only a number\nText: {text}\nGrade:"
+    return prompt
+
+def make_grade_fn(model_type, ai_prompt, rubric, custom_model_path=None):
+    if model_type == 'custom':
+        if not custom_model_path or not os.path.exists(custom_model_path):
+            raise RuntimeError("Custom model file not found.")
+        spec = importlib.util.spec_from_file_location("model_module", custom_model_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        if not hasattr(mod, "grade"):
+            raise RuntimeError("Custom script must define grade(text)")
+        return mod.grade
+    else:
+        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        if not os.environ.get('OPENAI_API_KEY'):
+            raise RuntimeError("OpenAI API key not set")
+        def grade_fn(text: str) -> float:
+            prompt = build_gpt_prompt(ai_prompt, rubric, text)
+            print(f"[GPT PROMPT] {prompt}")
+            try:
+                response = client.chat.completions.create(
+                    model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=10,
+                    temperature=0
+                )
+                pred = response.choices[0].message.content.strip()
+                return float(pred)
+            except Exception:
+                return float('nan')
+        return grade_fn
+
 @api.route('/api/variations', methods=['GET'])
 def get_variations():
     """Get available variations."""
@@ -71,36 +109,36 @@ def get_variations():
             'id': 'spelling',
             'name': 'Spelling Errors',
             'description': 'Introduce spelling mistakes in the text',
-            'magnitudeRange': [10, 50],
-            'defaultMagnitude': 30,
+            'magnitudeRange': [0, 100],
+            'defaultMagnitude': 50,
         },
         'spanglish': {
             'id': 'spanglish',
             'name': 'Spanglish',
             'description': 'Mix Spanish and English words',
-            'magnitudeRange': [20, 80],
+            'magnitudeRange': [0, 100],
             'defaultMagnitude': 50,
         },
         'noun_transfer': {
             'id': 'noun_transfer',
             'name': 'Noun Transfer',
             'description': 'Replace nouns with similar ones',
-            'magnitudeRange': [15, 60],
-            'defaultMagnitude': 40,
+            'magnitudeRange': [0, 100],
+            'defaultMagnitude': 50,
         },
         'cognates': {
             'id': 'cognates',
             'name': 'Cognates',
             'description': 'Use cognate words from other languages',
-            'magnitudeRange': [10, 40],
-            'defaultMagnitude': 25,
+            'magnitudeRange': [0, 100],
+            'defaultMagnitude': 50,
         },
         'pio': {
             'id': 'pio',
             'name': 'PIO (Part-of-Speech)',
             'description': 'Modify part-of-speech patterns',
-            'magnitudeRange': [20, 70],
-            'defaultMagnitude': 45,
+            'magnitudeRange': [0, 100],
+            'defaultMagnitude': 50,
         },
     }
     return jsonify(list(variations.values()))
@@ -176,39 +214,20 @@ def start_audit():
         rubric = audit_state.get('rubric', '')
         
         if model_type == 'custom':
-            # Load custom model from stored file
             if not model_script:
                 return jsonify({"error": "Custom model file required"}), 400
-            
-            # Save model script to temporary location
             temp_dir = tempfile.mkdtemp(prefix="custom_model_")
             model_path = os.path.join(temp_dir, model_script.filename)
             model_script.save(model_path)
-            
-            spec = importlib.util.spec_from_file_location("model_module", model_path)
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            if not hasattr(mod, "grade"):
-                return jsonify({"error": "Custom script must define grade(text)"}), 500
-            grade_fn = mod.grade
+            try:
+                grade_fn = make_grade_fn(model_type, ai_prompt, rubric, model_path)
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
         else:
-            # Use OpenAI API for grading
-            client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-            if not os.environ.get('OPENAI_API_KEY'):
-                return jsonify({'error': 'OpenAI API key not set'}), 500
-            def grade_fn(text: str) -> float:
-                prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
-                try:
-                    response = client.chat.completions.create(
-                        model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=10,
-                        temperature=0
-                    )
-                    pred = response.choices[0].message.content.strip()
-                    return float(pred)
-                except Exception:
-                    return float('nan')
+            try:
+                grade_fn = make_grade_fn(model_type, ai_prompt, rubric)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
         
         # Apply score cutoff if specified
         score_cutoff = None
@@ -451,50 +470,29 @@ def assess_performance():
     if model_type == 'custom':
         if not custom_model_file:
             return jsonify({'error': 'Custom model file required'}), 400
-        
-        # Use the stored model path from session_data
         model_path = session_data['custom_model_path']
         if not model_path or not os.path.exists(model_path):
             return jsonify({'error': 'Custom model file not found'}), 500
-            
         try:
-            spec = importlib.util.spec_from_file_location('custom_model', model_path)
-            custom_model = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(custom_model)
-            
-            # Check if grade function exists
-            if not hasattr(custom_model, 'grade'):
-                return jsonify({'error': 'Custom model must define a grade(text) function'}), 500
-                
-            # Assume the custom model has a function grade(text: str) -> float/int
-            for _, row in sample_df.iterrows():
-                text = row['text']
-                pred = custom_model.grade(text)
-                pred_grades.append(pred)
-                true = row['true_grade'] if 'true_grade' in row else None
-                if true is not None:
-                    true_grades.append(true)
-                results.append({'text': text, 'predicted_grade': pred, 'true_grade': true})
+            grade_fn = make_grade_fn(model_type, ai_prompt, rubric, model_path)
         except Exception as e:
             return jsonify({'error': f'Error loading custom model: {str(e)}'}), 500
-    else:
-        # Use OpenAI API for grading
-        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-        if not os.environ.get('OPENAI_API_KEY'):
-            return jsonify({'error': 'OpenAI API key not set'}), 500
         for _, row in sample_df.iterrows():
             text = row['text']
-            prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
-            try:
-                response = client.chat.completions.create(
-                    model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=10,
-                    temperature=0
-                )
-                pred = response.choices[0].message.content.strip()
-            except Exception as e:
-                pred = f"Error: {str(e)}"
+            pred = grade_fn(text)
+            pred_grades.append(pred)
+            true = row['true_grade'] if 'true_grade' in row else None
+            if true is not None:
+                true_grades.append(true)
+            results.append({'text': text, 'predicted_grade': pred, 'true_grade': true})
+    else:
+        try:
+            grade_fn = make_grade_fn(model_type, ai_prompt, rubric)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        for _, row in sample_df.iterrows():
+            text = row['text']
+            pred = grade_fn(text)
             pred_grades.append(pred)
             true = row['true_grade'] if 'true_grade' in row else None
             if true is not None:
@@ -640,33 +638,15 @@ def preview_audit():
     custom_model_path = session_data['custom_model_path']
 
     if model_type == 'custom':
-        # Load custom model from stored file
-        if not custom_model_path or not os.path.exists(custom_model_path):
-            return jsonify({"error": "Custom model file not found."}), 500
-        spec = importlib.util.spec_from_file_location("model_module", custom_model_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        if not hasattr(mod, "grade"):
-            return jsonify({"error": "Custom script must define grade(text)"}), 500
-        grade_fn = mod.grade
+        try:
+            grade_fn = make_grade_fn(model_type, ai_prompt, rubric, custom_model_path)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     else:
-        # Use OpenAI API for grading
-        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-        if not os.environ.get('OPENAI_API_KEY'):
-            return jsonify({'error': 'OpenAI API key not set'}), 500
-        def grade_fn(text: str) -> float:
-            prompt = f"{ai_prompt}\nRubric: {rubric}\n Respond with only a number\nText: {text}\nGrade:"
-            try:
-                response = client.chat.completions.create(
-                    model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=10,
-                    temperature=0
-                )
-                pred = response.choices[0].message.content.strip()
-                return float(pred)
-            except Exception:
-                return float('nan')
+        try:
+            grade_fn = make_grade_fn(model_type, ai_prompt, rubric)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     df_preview = pd.DataFrame({"text": sample_texts})
     auditor = Auditor(model=grade_fn, data=df_preview)

@@ -142,7 +142,6 @@ class Auditor:
                     'magnitude': mag,
                     'original_grade': orig_grade,
                     'perturbed_grade': pert_grade,
-                    'difference': pert_grade - orig_grade,
                 }
                 if group_vals is not None:
                     row['group'] = group_vals[idx] if idx < len(group_vals) else 'unknown'
@@ -152,7 +151,7 @@ class Auditor:
         # --- Additional bias measures ---
         if not self.results.empty:
             m = self.results['magnitude'] / 100
-            err = self.results['difference']
+            err = self.results['original_grade'] - self.results['perturbed_grade']
             orig = self.results['original_grade']
             # Map variation to feature column
             var_to_col = {
@@ -182,7 +181,7 @@ class Auditor:
             self.results.drop(columns=['feature_col', 'feature_val', 'num_words_val', 'pert'], inplace=True)
             
             # Round numeric columns to 3 decimal places
-            numeric_columns = ['original_grade', 'perturbed_grade', 'difference', 'bias_0', 'bias_1', 'bias_2', 'bias_3']
+            numeric_columns = ['original_grade', 'perturbed_grade', 'bias_0', 'bias_1', 'bias_2', 'bias_3']
             for col in numeric_columns:
                 if col in self.results.columns:
                     self.results[col] = self.results[col].round(3)
