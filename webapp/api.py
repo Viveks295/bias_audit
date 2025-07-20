@@ -209,7 +209,7 @@ def start_audit():
             return jsonify({'error': 'CSV must contain a "text" column'}), 400
         
         # Set up the model based on audit state
-        model_type = audit_state.get('selectedLLM', {}).get('type', 'custom')
+        model_type = audit_state.get('selectedLLM', {}).get('id', 'custom')
         ai_prompt = audit_state.get('aiPrompt', '')
         rubric = audit_state.get('rubric', '')
         
@@ -285,13 +285,14 @@ def start_audit():
                 'magnitude': row['magnitude'],
                 'originalGrade': float(row['original_grade']),
                 'perturbedGrade': float(row['perturbed_grade']),
-                'difference': float(row['difference']),
                 'biasMeasures': {
                     'bias_0': float(row['bias_0']),
                     'bias_1': float(row['bias_1']),
                     'bias_2': float(row['bias_2']),
                     'bias_3': float(row['bias_3']),
-                }
+                },
+                'original_text': row.get('original_text', ''),
+                'perturbed_text': row.get('perturbed_text', ''),
             }
             if 'group' in row:
                 result['group'] = str(row['group'])
@@ -299,7 +300,7 @@ def start_audit():
         
         # Calculate summary statistics
         total_variations = len(set(r['variation'] for r in results))
-        average_grade_change = sum(r['difference'] for r in results) / len(results)
+        average_grade_change = sum(r['biasMeasures']['bias_0'] for r in results) / len(results)
         max_bias_measure = max(abs(r['biasMeasures']['bias_1']) for r in results)
         groups_analyzed = len(set(r.get('group', 'default') for r in results))
         
@@ -351,8 +352,8 @@ def get_results(session_id):
         results = session_data['results']
         
         # Calculate summary statistics
-        total_variations = len(results)
-        average_grade_change = sum(r['difference'] for r in results) / total_variations
+        total_variations = len(set(r['variation'] for r in results))
+        average_grade_change = sum(r['biasMeasures']['bias_0'] for r in results) / total_variations
         max_bias_measure = max(abs(r['biasMeasures']['bias_1']) for r in results)
         groups_analyzed = len(set(r.get('group', 'default') for r in results))
 
@@ -395,12 +396,24 @@ def download_results(session_id):
         return jsonify({'error': 'Audit not completed'}), 400
     
     results = session_data['results']
-    
-    # Create CSV content
-    csv_content = "Variation,Magnitude,Original Grade,Perturbed Grade,Difference,Bias_0,Bias_1,Bias_2,Bias_3,Group\n"
-    
+
+    # Determine if grouping was used (any result has a non-empty 'group' field)
+    grouping_used = any('group' in r and r['group'] not in (None, '', 'default', 'unknown') for r in results)
+
+    # Create CSV content with or without Group column
+    if grouping_used:
+        csv_content = "Variation,Magnitude,Original Text,Perturbed Text,Original Grade,Perturbed Grade,Bias_0,Bias_1,Bias_2,Bias_3,Group\n"
+    else:
+        csv_content = "Variation,Magnitude,Original Text,Perturbed Text,Original Grade,Perturbed Grade,Bias_0,Bias_1,Bias_2,Bias_3\n"
+
     for result in results:
-        csv_content += f"{result['variation']},{result['magnitude']},{result['originalGrade']},{result['perturbedGrade']},{result['difference']},{result['biasMeasures']['bias_0']},{result['biasMeasures']['bias_1']},{result['biasMeasures']['bias_2']},{result['biasMeasures']['bias_3']},{result.get('group', '')}\n"
+        original_text = result.get('original_text', '')
+        perturbed_text = result.get('perturbed_text', '')
+        row = f"{result['variation']},{result['magnitude']},\"{original_text}\",\"{perturbed_text}\",{result['originalGrade']},{result['perturbedGrade']},{result['biasMeasures']['bias_0']},{result['biasMeasures']['bias_1']},{result['biasMeasures']['bias_2']},{result['biasMeasures']['bias_3']}"
+        if grouping_used:
+            row += f",{result.get('group', '')}"
+        row += "\n"
+        csv_content += row
     
     # Create temporary file
     temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv')

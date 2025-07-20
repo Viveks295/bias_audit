@@ -45,7 +45,7 @@ def test_perturb_and_audit(monkeypatch, df, varname):
     assert 'text' in pert_df.columns
     # Run full audit
     report = aud.audit([varname], [50])
-    assert 'difference' in report.columns
+    assert 'bias_0' in report.columns
     # Should have one row per text
     assert len(report) == len(df)
     
@@ -83,7 +83,7 @@ def test_score_cutoff(auditor):
 
 def test_audit_output_columns(auditor):
     result = auditor.audit(['spelling'], [10])
-    expected_cols = {'index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'difference'}
+    expected_cols = {'index', 'variation', 'magnitude', 'original_grade', 'perturbed_grade', 'bias_0'}
     assert expected_cols.issubset(result.columns)
 
 def test_bias_measures_present(auditor):

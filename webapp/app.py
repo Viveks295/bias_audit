@@ -100,9 +100,9 @@ def _summarise_and_render(report: pd.DataFrame,
     report_path = os.path.join(WORKDIR, "audit_report.csv")
     report.to_csv(report_path, index=False)
 
-    summary = (report.groupby("variation", as_index=False)["difference"]
+    summary = (report.groupby("variation", as_index=False)["bias_0"]
                       .mean()
-                      .rename(columns={"difference": "bias"}))
+                      .rename(columns={"bias_0": "bias"}))
 
     table_html = summary.to_html(
         classes=("min-w-full bg-white divide-y divide-gray-200 divide-x "

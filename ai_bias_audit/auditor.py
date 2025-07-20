@@ -142,6 +142,8 @@ class Auditor:
                     'magnitude': mag,
                     'original_grade': orig_grade,
                     'perturbed_grade': pert_grade,
+                    'original_text': filtered_data.loc[idx, 'text'],
+                    'perturbed_text': df_to_perturb.loc[idx, 'text'],
                 }
                 if group_vals is not None:
                     row['group'] = group_vals[idx] if idx < len(group_vals) else 'unknown'

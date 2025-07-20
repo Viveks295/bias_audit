@@ -60,7 +60,7 @@ const ResultsPage: React.FC = () => {
     const loadResults = async () => {
       // If auditState has auditResults (navigated from audit flow), use them
       if (auditState?.auditResults) {
-        setResults(auditState.auditResults.results);
+        setResults(auditState.auditResults.results || []);
         setSummary(auditState.auditResults.summary);
         setMoments(auditState.auditResults.moments || []);
         return;
@@ -74,7 +74,7 @@ const ResultsPage: React.FC = () => {
         setLoading(true);
         try {
           const response = await auditAPI.getResults(sessionId);
-          setResults(response.results);
+          setResults(response.results || []);
           setSummary(response.summary);
           setMoments(response.moments || []);
         } catch (err) {
@@ -201,9 +201,9 @@ const ResultsPage: React.FC = () => {
     if (!sessionId) {
       // Fallback to client-side download if no session ID
       const csvContent = "data:text/csv;charset=utf-8," + 
-        "Variation,Magnitude,Original Grade,Perturbed Grade,Difference,Bias_0,Bias_1,Bias_2,Bias_3,Group\n" +
+        "Variation,Magnitude,Original Grade,Perturbed Grade,Bias_0,Bias_1,Bias_2,Bias_3,Group\n" +
         results.map((r: AuditResult) => 
-          `${r.variation},${r.magnitude},${r.originalGrade},${r.perturbedGrade},${r.difference},${r.biasMeasures.bias_0},${r.biasMeasures.bias_1},${r.biasMeasures.bias_2},${r.biasMeasures.bias_3},${r.group || ''}`
+          `${r.variation},${r.magnitude},${r.originalGrade},${r.perturbedGrade},${r.biasMeasures.bias_0},${r.biasMeasures.bias_1},${r.biasMeasures.bias_2},${r.biasMeasures.bias_3},${r.group || ''}`
         ).join("\n");
       
       const encodedUri = encodeURI(csvContent);
