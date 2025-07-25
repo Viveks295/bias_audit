@@ -1,4 +1,0 @@
-pandas
-click
-nltk
-deep-translator

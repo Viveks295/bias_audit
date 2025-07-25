@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+
+# Node.js (if any JS scripts/tools)
+node_modules/
+
+# OS files
+.DS_Store
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# VS Code settings (optional)
+.vscode/
