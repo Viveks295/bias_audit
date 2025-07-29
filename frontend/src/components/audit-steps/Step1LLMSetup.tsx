@@ -194,7 +194,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
       // Fetch the toy data file
       const response = await fetch('/test_data/hewlett_data.csv');
       if (!response.ok) {
-        throw new Error('Failed to load toy data');
+        throw new Error('Failed to load sample data');
       }
       
       const csvContent = await response.text();
@@ -218,7 +218,7 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
         setHasTrueGrade(hasTrueGradeColumn);
         
         if (!hasTextColumn) {
-          setUploadError('Toy data file must contain a column named "text"');
+          setUploadError('Sample data file must contain a column named "text"');
           return;
         }
         
@@ -244,7 +244,7 @@ Prompt: More and more people use computers, but not everyone agrees that this be
         
       }
     } catch (error) {
-      setUploadError('Error loading toy data: ' + (error as Error).message);
+      setUploadError('Error loading sample data: ' + (error as Error).message);
     } finally {
       setIsUploading(false);
     }
@@ -466,7 +466,7 @@ Prompt: More and more people use computers, but not everyone agrees that this be
                 disabled={isUploading}
                 sx={{ mb: 2 }}
               >
-                {isUploading ? 'Loading Toy Data...' : 'Use Toy Data (Hewlett Essays)'}
+                {isUploading ? 'Loading Sample Data...' : 'Use Sample Data (Hewlett Essays)'}
               </Button>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                 Load a sample dataset of student essays about computers and automatically configure GPT-4.1 with the appropriate prompt.
