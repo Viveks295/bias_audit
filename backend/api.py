@@ -16,9 +16,6 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
-
 # Global storage for audit sessions
 audit_sessions = {}
 
@@ -62,7 +59,6 @@ SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@biasaudit.com')
 
 api = Blueprint('api', __name__)
-CORS(api)  # Enable CORS specifically for the API Blueprint
 
 def build_gpt_prompt(ai_prompt, rubric, text):
     prompt = f"{ai_prompt}\n"
@@ -695,5 +691,4 @@ def create_session():
 
     return jsonify({'session_id': session_id})
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000) 
+# This file should not be run directly - use app.py instead 

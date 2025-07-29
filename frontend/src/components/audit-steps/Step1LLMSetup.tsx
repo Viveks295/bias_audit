@@ -17,7 +17,7 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from '@mui/material';
-import { CloudUpload, CheckCircle, ExpandMore, PlayArrow, SkipNext } from '@mui/icons-material';
+import { CloudUpload, CheckCircle, ExpandMore, PlayArrow, SkipNext, Science } from '@mui/icons-material';
 import { AuditState, LLMModel, PerformanceMetric } from '../../types';
 import { auditAPI } from '../../services/api';
 import Papa from 'papaparse';
@@ -183,6 +183,71 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
       setIsUploading(false);
     };
     reader.readAsText(file);
+  };
+
+  // Add function to handle toy data loading
+  const handleUseToyData = async () => {
+    setIsUploading(true);
+    setUploadError(null);
+    
+    try {
+      // Fetch the toy data file
+      const response = await fetch('/test_data/hewlett_data.csv');
+      if (!response.ok) {
+        throw new Error('Failed to load toy data');
+      }
+      
+      const csvContent = await response.text();
+      
+      // Create a File object from the CSV content
+      const file = new File([csvContent], 'hewlett_data.csv', { type: 'text/csv' });
+      
+      // Parse the CSV to get headers and preview data
+      const parsed = Papa.parse(csvContent, { header: false });
+      if (parsed.data && parsed.data.length > 0) {
+        const headers = parsed.data[0] as string[];
+        setCsvHeaders(headers);
+        setCsvData((parsed.data as string[][]).slice(1, 6)); // first 5 rows
+        
+        // Check if text column exists
+        const hasTextColumn = headers.some(header => 
+          header.toLowerCase() === 'text'
+        );
+        // Check if true_grade column exists
+        const hasTrueGradeColumn = headers.some(header => header.toLowerCase() === 'true_grade');
+        setHasTrueGrade(hasTrueGradeColumn);
+        
+        if (!hasTextColumn) {
+          setUploadError('Toy data file must contain a column named "text"');
+          return;
+        }
+        
+        // Set the file and preview
+        setUploadedFile(file);
+        setFilePreview(csvContent.substring(0, 500) + (csvContent.length > 500 ? '...' : ''));
+        
+        // Automatically configure the model settings
+        const gpt41Model = availableLLMs.find(llm => llm.id === 'gpt-4.1');
+        setSelectedLLM(gpt41Model || null);
+        
+        // Set the AI prompt
+        const toyDataPrompt = `Grade the essay on a scale of 0 to 100 for the following prompt.
+
+Prompt: More and more people use computers, but not everyone agrees that this benefits society. Those who support advances in technology believe that computers have a positive effect on people. They teach hand-eye coordination, give people the ability to learn about faraway places and people, and even allow people to talk online with other people. Others have different ideas. Some experts are concerned that people are spending too much time on their computers and less time exercising, enjoying nature, and interacting with family and friends. Write a letter to your local newspaper in which you state your opinion on the effects computers have on people. Persuade the readers to agree with you.`;
+        
+        setAiPrompt(toyDataPrompt);
+        
+        // Set outcome type and metric since we have true_grade
+        setOutcomeType('continuous');
+        const mseMetric = performanceMetrics.find(m => m.id === 'mse');
+        setSelectedMetric(mseMetric || null);
+        
+      }
+    } catch (error) {
+      setUploadError('Error loading toy data: ' + (error as Error).message);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleLLMChange = (llmId: string) => {
@@ -390,6 +455,23 @@ const Step1LLMSetup: React.FC<Step1LLMSetupProps> = ({
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
               Note: The column containing demographic group information does not need to be named "demographic_group". You will be able to select the appropriate column in a later step.
             </Typography>
+            
+            {/* Toy Data Button */}
+            <Box sx={{ mb: 2 }}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<Science />}
+                onClick={handleUseToyData}
+                disabled={isUploading}
+                sx={{ mb: 2 }}
+              >
+                {isUploading ? 'Loading Toy Data...' : 'Use Toy Data (Hewlett Essays)'}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Load a sample dataset of student essays about computers and automatically configure GPT-4.1 with the appropriate prompt.
+              </Typography>
+            </Box>
             
             <Paper
               variant="outlined"
