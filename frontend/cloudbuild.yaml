@@ -1,0 +1,19 @@
+steps:
+  - name: "node:18"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        npm ci
+        npm run build
+    dir: "frontend"
+
+  - name: "firebase/firebase-tools"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        firebase deploy --only hosting --project $PROJECT_ID
+    dir: "frontend"
+
+timeout: 900s
