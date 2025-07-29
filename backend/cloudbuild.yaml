@@ -12,7 +12,7 @@ steps:
       [
         "run",
         "deploy",
-        "backend",
+        "bias-audit-backend",
         "--image",
         "gcr.io/$PROJECT_ID/backend",
         "--region",

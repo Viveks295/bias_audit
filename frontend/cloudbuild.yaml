@@ -4,11 +4,12 @@ steps:
     args:
       - -c
       - |
+        echo "REACT_APP_API_URL=$_API_URL" > .env.production
         npm ci
         npm run build
     dir: "frontend"
 
-  - name: "firebase/firebase-tools"
+  - name: "gcr.io/firebase-ci/firebase-tools"
     entrypoint: bash
     args:
       - -c
@@ -17,6 +18,5 @@ steps:
     dir: "frontend"
 
 timeout: 900s
-
 options:
   logging: CLOUD_LOGGING_ONLY
