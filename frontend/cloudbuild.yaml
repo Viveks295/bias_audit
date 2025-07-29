@@ -17,3 +17,6 @@ steps:
     dir: "frontend"
 
 timeout: 900s
+
+options:
+  logging: CLOUD_LOGGING_ONLY
