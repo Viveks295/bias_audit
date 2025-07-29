@@ -9,7 +9,7 @@ steps:
         npm run build
     dir: "frontend"
 
-  - name: "docker.io/firebase/firebase-tools"
+  - name: "gcr.io/cloud-builders/firebase"
     entrypoint: bash
     args:
       - -c
