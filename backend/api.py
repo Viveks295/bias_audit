@@ -96,9 +96,6 @@ def make_grade_fn(model_type, ai_prompt, rubric, custom_model_path=None):
                 return float('nan')
         return grade_fn
     
-@app.route("/")
-def index():
-    return "Bias Audit Backend is running!"
 
 @api.route('/api/variations', methods=['GET'])
 def get_variations():

@@ -18,5 +18,6 @@ CORS(app, resources={
 app.register_blueprint(api)
 
 if __name__ == "__main__":
+    print(f"Starting Flask server on port {os.environ.get('PORT', 8080)}...")
     port = int(os.environ.get("PORT", 8080))
     app.run(debug=False, host="0.0.0.0", port=port)
