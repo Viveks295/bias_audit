@@ -24,6 +24,8 @@ jobs:
 
       - name: Build project
         run: npm run build
+        env:
+          CI: false
 
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
