@@ -2,18 +2,15 @@ import os
 from flask import Flask
 from api import api
 from flask_cors import CORS
+from config import CORS_ORIGINS
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 # Configure CORS properly
-CORS(app, resources={
-    r"/api/*": {
-        "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
+CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
+
 
 app.register_blueprint(api)
 
