@@ -7,13 +7,43 @@ A comprehensive framework for auditing bias in AI grading models through systema
 ## 🚀 Quick Start
 
 #### Python Backend
+
 ```bash
 cd backend
 pip install -r requirements.txt
 python app.py
 ```
 
+##### Running in a Virtual Environment (Recommended)
+
+To avoid dependency conflicts and ensure compatibility:
+
+```bash
+# Navigate to the backend folder
+cd backend
+
+# Create a virtual environment with Python 3.11
+python3.11 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate   # On macOS/Linux
+# .\venv\Scripts\activate   # On Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the Flask app
+python app.py
+```
+
+To exit the virtual environment:
+
+```bash
+deactivate
+```
+
 #### React Frontend
+
 ```bash
 cd frontend
 npm install
@@ -46,10 +76,10 @@ frontend/
 README.md                       # Project documentation
 ```
 
-
 ## 🎯 Features
 
 ### Core Framework
+
 - **Systematic Bias Detection**: Apply controlled linguistic variations to identify bias
 - **Multiple Variation Types**: Spelling errors, Spanglish, noun transfers, cognates, PIO
 - **Comprehensive Metrics**: Multiple bias measures and statistical moments
@@ -57,27 +87,30 @@ README.md                       # Project documentation
 - **Performance Assessment**: Evaluate model performance before auditing
 
 ### React Frontend
+
 - **Step-by-Step Workflow**: Guided audit process following the framework
-- **Modern UI**: Clean, professional interface 
+- **Modern UI**: Clean, professional interface
 - **Interactive Components**: Real-time validation and feedback
 - **Data Visualization**: Charts and tables for result analysis
 - **Responsive Design**: Works on desktop and mobile devices
 
 ### Python Backend
+
 - **REST API**: Clean API endpoints for frontend integration
 - **File Upload**: Support for CSV data and model scripts
 - **Session Management**: Track audit sessions and results
 - **CSV Export**: Download audit results for further analysis
 
-
 ## 🔧 Installation
 
 ### Prerequisites
+
 - Python 3.11
 - Node.js 14+
 - npm or yarn
 
 ### Python Package (for development or direct use)
+
 ```bash
 cd backend
 pip install -e .
@@ -91,12 +124,14 @@ EOF
 ```
 
 ### React Frontend
+
 ```bash
 cd frontend
 npm install
 ```
 
 ### Backend Dependencies
+
 ```bash
 cd backend
 pip install -r requirements.txt
@@ -107,7 +142,9 @@ pip install -r requirements.txt
 ### Using the React Frontend
 
 1. **Start the Application**
+
    #### Python Backend
+
    ```bash
    cd backend
    pip install -r requirements.txt
@@ -115,6 +152,7 @@ pip install -r requirements.txt
    ```
 
    #### React Frontend
+
    ```bash
    cd frontend
    npm install
@@ -122,6 +160,7 @@ pip install -r requirements.txt
    ```
 
 2. **Follow the Audit Process**
+
    - Choose your LLM and define outcome type
    - Select linguistic variations to test
    - Set variation magnitudes
@@ -167,24 +206,29 @@ ai-bias-audit --data test_data/essays.csv --model-script test_data/model.py --mo
 The framework follows a systematic 6-step process:
 
 1. **LLM Setup & Assessment**
+
    - Choose language model
    - Define outcome type (binary/continuous)
    - Select performance metric
    - Assess initial performance
 
 2. **Data Filtering & Variations**
+
    - Apply optional score cutoffs
    - Select linguistic variations to test
 
 3. **Validation & Sampling**
+
    - Validate selected variations
    - Sample audit results
 
 4. **Additional Measures**
+
    - Choose additional bias measures
    - Configure statistical moments
 
 5. **Magnitude Selection**
+
    - Set variation magnitudes
    - Configure grouping variables
 
@@ -195,6 +239,7 @@ The framework follows a systematic 6-step process:
 ## 📊 Linguistic Variations
 
 ### Available Variations
+
 - **Spelling Errors**: Introduce spelling mistakes
 - **Spanglish**: Mix Spanish and English phrases
 - **Noun Transfer**: Replace nouns with Spanish translation
@@ -202,11 +247,11 @@ The framework follows a systematic 6-step process:
 - **PIO**: Phonetically-induced spelling errors
 
 ### Bias Measures
+
 - **B₀**: Raw difference between original and perturbed grades
 - **B₁**: Normalized bias measure accounting for variation magnitude
 - **B₂**: Feature-weighted bias measure considering amount of text able to be changed
 - **B₃**: Grade-adjusted bias measure accounting for original grade levels
-
 
 ## 📝 API Documentation
 
@@ -220,17 +265,18 @@ The framework follows a systematic 6-step process:
 - `GET /api/health` - Health check
 
 ### Example API Usage
+
 ```javascript
 // Start audit
-const response = await fetch('/api/audit', {
-  method: 'POST',
-  body: formData
-});
+const response = await fetch("/api/audit", {
+  method: "POST",
+  body: formData,
+})
 
 // Get results
-const results = await fetch('/api/results/audit_1');
+const results = await fetch("/api/results/audit_1")
 ```
 
 ## 📄 License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
