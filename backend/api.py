@@ -5,6 +5,7 @@ import tempfile
 import os
 import json
 import traceback
+import math
 from typing import Dict, Any, List
 import importlib.util
 import os
@@ -83,17 +84,34 @@ def make_grade_fn(model_type, ai_prompt, rubric, custom_model_path=None):
             raise RuntimeError("OpenAI API key not set")
         def grade_fn(text: str) -> float:
             prompt = build_gpt_prompt(ai_prompt, rubric, text)
-            try:
-                response = client.chat.completions.create(
-                    model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=10,
-                    temperature=0
-                )
-                pred = response.choices[0].message.content.strip()
-                return float(pred)
-            except Exception:
-                return float('nan')
+            max_retries = 5
+            
+            for attempt in range(max_retries):
+                try:
+                    response = client.chat.completions.create(
+                        model='gpt-4o-2024-08-06' if model_type == 'gpt-4o' else 'gpt-4.1-2025-04-14',
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=10,
+                        temperature=0
+                    )
+                    pred = response.choices[0].message.content.strip()
+                    # Try to convert to float
+                    grade = float(pred)
+                    return grade
+                except (ValueError, TypeError):
+                    # If conversion fails, try again (up to max_retries)
+                    if attempt == max_retries - 1:
+                        # On final attempt, return 0 instead of NaN
+                        return 0.0
+                    continue
+                except Exception:
+                    # For other exceptions (API errors, etc.), return 0 on final attempt
+                    if attempt == max_retries - 1:
+                        return 0.0
+                    continue
+            
+            # This should never be reached, but just in case
+            return 0.0
         return grade_fn
     
 
@@ -262,16 +280,24 @@ def start_audit():
         # Convert results to the expected format
         results = []
         for _, row in bias_df.iterrows():
+            # Handle NaN values by converting them to 0.0
+            def safe_float(value):
+                try:
+                    float_val = float(value)
+                    return 0.0 if math.isnan(float_val) else float_val
+                except (ValueError, TypeError):
+                    return 0.0
+            
             result = {
                 'variation': row['variation'],
                 'magnitude': row['magnitude'],
-                'originalGrade': float(row['original_grade']),
-                'perturbedGrade': float(row['perturbed_grade']),
+                'originalGrade': safe_float(row['original_grade']),
+                'perturbedGrade': safe_float(row['perturbed_grade']),
                 'biasMeasures': {
-                    'bias_0': float(row['bias_0']),
-                    'bias_1': float(row['bias_1']),
-                    'bias_2': float(row['bias_2']),
-                    'bias_3': float(row['bias_3']),
+                    'bias_0': safe_float(row['bias_0']),
+                    'bias_1': safe_float(row['bias_1']),
+                    'bias_2': safe_float(row['bias_2']),
+                    'bias_3': safe_float(row['bias_3']),
                 },
                 'original_text': row.get('original_text', ''),
                 'perturbed_text': row.get('perturbed_text', ''),
@@ -498,8 +524,15 @@ def assess_performance():
     metric_value = None
     if true_grades and metric:
         try:
-            y_true = [float(x) for x in true_grades]
-            y_pred = [float(x) for x in pred_grades]
+            def safe_float(value):
+                try:
+                    float_val = float(value)
+                    return 0.0 if math.isnan(float_val) else float_val
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            y_true = [safe_float(x) for x in true_grades]
+            y_pred = [safe_float(x) for x in pred_grades]
             if metric == 'accuracy':
                 metric_value = sum(1 for a, b in zip(y_true, y_pred) if a == b) / len(y_true)
             elif metric == 'mse':
