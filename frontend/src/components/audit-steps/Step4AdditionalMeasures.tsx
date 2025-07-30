@@ -32,16 +32,39 @@ interface Step4AdditionalMeasuresProps {
 }
 
 const availableMeasures = [
-  { id: 'bias_1', name: 'Bias Measure 1', description: 'Normalized bias measure' },
-  { id: 'bias_2', name: 'Bias Measure 2', description: 'Feature-weighted bias measure' },
-  { id: 'bias_3', name: 'Bias Measure 3', description: 'Grade-adjusted bias measure' },
+  { 
+    id: 'bias_1', 
+    name: 'Bias Measure 1', 
+    description: 'Measures bias by taking into account the magnitude of the variation appled to the text.' 
+  },
+  { 
+    id: 'bias_2', 
+    name: 'Bias Measure 2', 
+    description: 'Measures bias by taking into account the magnitude as well as how much of the text can be varied, which reflects the actual amount of the text which was changed.' 
+  },
+  { 
+    id: 'bias_3', 
+    name: 'Bias Measure 3', 
+    description: 'Measures bias by adjusting for the baseline grade level of the text. This helps identify whether bias is more pronounced for certain grade ranges.' 
+  },
 ];
 
 const availableMoments = [
-  { id: 'mean', name: 'Mean', description: 'First moment (average)' },
-  { id: 'variance', name: 'Variance', description: 'Second moment (spread)' },
-  { id: 'skewness', name: 'Skewness', description: 'Third moment (asymmetry)' },
-  { id: 'kurtosis', name: 'Kurtosis', description: 'Fourth moment (peakedness)' },
+  { 
+    id: 'mean', 
+    name: 'Mean', 
+    description: 'The average bias value across all samples. This gives you the central tendency of how the model responds to linguistic variations, showing whether the model tends to be biased in a particular direction (higher or lower grades).' 
+  },
+  { 
+    id: 'variance', 
+    name: 'Variance', 
+    description: 'Measures how much the bias values spread out from the mean. High variance indicates inconsistent grading behavior. Low variance suggests more consistent bias patterns.' 
+  },
+  { 
+    id: 'skewness', 
+    name: 'Skewness', 
+    description: 'Measures the asymmetry of the bias. Positive skewness means most variations cause small decreases but a few cause large increases, negative skewness means the opposite.' 
+  },
 ];
 
 const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
@@ -212,7 +235,7 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
                       <TableRow>
                         {biasTableCols.map((col) => (
                           <TableCell key={col} sx={{ fontWeight: 'bold' }}>
-                            {col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {col === 'perturbed_grade' ? 'Grade For Variation' : col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </TableCell>
                         ))}
                       </TableRow>
