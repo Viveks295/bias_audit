@@ -20,6 +20,7 @@ import {
   TableRow,
   Paper,
   Chip,
+  Tooltip,
 } from '@mui/material';
 import { AuditState } from '../../types';
 import { auditAPI } from '../../services/api';
@@ -394,13 +395,20 @@ const Step4AdditionalMeasures: React.FC<Step4AdditionalMeasuresProps> = ({
         <Button onClick={onBack}>
           Back
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleNext}
-          disabled={!canProceed}
+        <Tooltip 
+          title={!canProceed ? "Please make sure you complete all required steps before proceeding." : ""}
+          open={!canProceed ? undefined : false}
         >
-          Next Step
-        </Button>
+          <span>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!canProceed}
+            >
+              Next Step
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );

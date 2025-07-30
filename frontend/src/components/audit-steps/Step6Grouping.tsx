@@ -12,6 +12,7 @@ import {
   TextField,
   CircularProgress,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import { AuditState } from '../../types';
 import { auditAPI } from '../../services/api';
@@ -217,14 +218,21 @@ const Step6Grouping: React.FC<Step6GroupingProps> = ({
         <Button onClick={onBack}>
           Back
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleFinish}
-          disabled={!canProceed || isGenerating}
-          startIcon={isGenerating ? <CircularProgress size={20} /> : null}
+        <Tooltip 
+          title={!canProceed ? "Please make sure you complete all required steps before proceeding." : ""}
+          open={!canProceed ? undefined : false}
         >
-          {isGenerating ? 'Generating Report...' : 'Generate Final Report'}
-        </Button>
+          <span>
+            <Button
+              variant="contained"
+              onClick={handleFinish}
+              disabled={!canProceed || isGenerating}
+              startIcon={isGenerating ? <CircularProgress size={20} /> : null}
+            >
+              {isGenerating ? 'Generating Report...' : 'Generate Final Report'}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );

@@ -8,6 +8,7 @@ import {
   Slider,
   TextField,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import { AuditState, Variation } from '../../types';
 
@@ -160,13 +161,20 @@ const Step5Magnitudes: React.FC<Step5MagnitudesProps> = ({
         <Button onClick={onBack}>
           Back
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleNext}
-          disabled={!canProceed}
+        <Tooltip 
+          title={!canProceed ? "Please make sure you complete all required steps before proceeding." : ""}
+          open={!canProceed ? undefined : false}
         >
-          Next Step
-        </Button>
+          <span>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!canProceed}
+            >
+              Next Step
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );

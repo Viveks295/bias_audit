@@ -21,6 +21,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Tooltip,
 } from '@mui/material';
 import { ExpandMore } from '@mui/icons-material';
 import { AuditState } from '../../types';
@@ -185,13 +186,20 @@ const Step3Validation: React.FC<Step3ValidationProps> = ({
         <Button onClick={onBack}>
           Back
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleNext}
-          disabled={!canProceed}
+        <Tooltip 
+          title={!canProceed ? "Please make sure you complete all required steps before proceeding." : ""}
+          open={!canProceed ? undefined : false}
         >
-          Next Step
-        </Button>
+          <span>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!canProceed}
+            >
+              Next Step
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );

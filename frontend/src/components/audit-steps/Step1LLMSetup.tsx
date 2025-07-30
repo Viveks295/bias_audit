@@ -16,6 +16,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Tooltip,
 } from '@mui/material';
 import { CloudUpload, CheckCircle, ExpandMore, PlayArrow, SkipNext, Science } from '@mui/icons-material';
 import { AuditState, LLMModel, PerformanceMetric } from '../../types';
@@ -871,13 +872,20 @@ Prompt: More and more people use computers, but not everyone agrees that this be
 
       {/* Navigation */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-        <Button
-          variant="contained"
-          onClick={handleNext}
-          disabled={!canProceed}
+        <Tooltip 
+          title={!canProceed ? "Please make sure you complete all required steps before proceeding." : ""}
+          open={!canProceed ? undefined : false}
         >
-          Next Step
-        </Button>
+          <span>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!canProceed}
+            >
+              Next Step
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );

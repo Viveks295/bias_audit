@@ -13,6 +13,7 @@ import {
   Checkbox,
   FormGroup,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import { AuditState, Variation } from '../../types';
 
@@ -70,6 +71,7 @@ const Step2DataFiltering: React.FC<Step2DataFilteringProps> = ({
   const [useScoreCutoff, setUseScoreCutoff] = useState<boolean | null>(auditState.useScoreCutoff);
   const [cutoffScore, setCutoffScore] = useState<number | null>(auditState.cutoffScore);
   const [selectedVariations, setSelectedVariations] = useState<Variation[]>(auditState.selectedVariations);
+  const [showError, setShowError] = useState(false);
 
   const handleVariationToggle = (variation: Variation) => {
     setSelectedVariations(prev => 
@@ -80,6 +82,14 @@ const Step2DataFiltering: React.FC<Step2DataFilteringProps> = ({
   };
 
   const handleNext = () => {
+    const canProceed = useScoreCutoff !== null && selectedVariations.length > 0;
+    
+    if (!canProceed) {
+      setShowError(true);
+      return;
+    }
+    
+    setShowError(false);
     onComplete({
       useScoreCutoff,
       cutoffScore,
@@ -98,6 +108,12 @@ const Step2DataFiltering: React.FC<Step2DataFilteringProps> = ({
       <Typography variant="body1" color="text.secondary" paragraph>
         Choose whether to filter data by score cutoff and select linguistic variations to test.
       </Typography>
+
+      {showError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Please make sure you complete all required steps before proceeding.
+        </Alert>
+      )}
 
       <Box sx={{ mb: 3 }}>
         <Card>
@@ -177,13 +193,20 @@ const Step2DataFiltering: React.FC<Step2DataFilteringProps> = ({
         <Button onClick={onBack}>
           Back
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleNext}
-          disabled={!canProceed}
+        <Tooltip 
+          title={!canProceed ? "Please make sure you complete all required steps before proceeding." : ""}
+          open={!canProceed ? undefined : false}
         >
-          Next Step
-        </Button>
+          <span>
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={!canProceed}
+            >
+              Next Step
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
     </Box>
   );
